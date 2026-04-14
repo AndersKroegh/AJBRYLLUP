@@ -5,15 +5,19 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken }
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, onSnapshot, updateDoc, query, orderBy } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  // Placeholder - i produktion på Vercel/Cloudflare vil du indsætte dine egne Firebase variabler her
-  apiKey: "demo", authDomain: "demo", projectId: "demo", storageBucket: "demo", messagingSenderId: "demo", appId: "demo"
+const firebaseConfig = {
+  apiKey: "AIzaSyC-baRY8ADfQ_oS0U51D80Bql_GKw8b8OU",
+  authDomain: "bryllups-website.firebaseapp.com",
+  projectId: "bryllups-website",
+  storageBucket: "bryllups-website.firebasestorage.app",
+  messagingSenderId: "614384539759",
+  appId: "1:614384539759:web:2160ecc6dfb1b0711e559a"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'wedding-app-id';
+const appId = 'bryllups-website-app'; // Unikt ID til din database
 
 // Default Data hvis databasen er tom
 const DEFAULT_DATA = {
@@ -92,11 +96,7 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
+        await signInAnonymously(auth);
       } catch (error) {
         console.error("Auth error:", error);
       }
