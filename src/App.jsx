@@ -418,7 +418,7 @@ function AdminPage({ data, user }) {
           <h2 className="font-serif text-2xl mb-6">Admin Panel</h2>
           <input 
             type="password" 
-            placeholder="Indtast pinkode (2026)"
+            placeholder="Indtast adgangskode"
             value={pin}
             onChange={e => setPin(e.target.value)}
             className="w-full text-center border border-stone-300 rounded-md p-3 mb-4 focus:outline-none focus:border-stone-500"
