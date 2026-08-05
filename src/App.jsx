@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Heart, MapPin, Clock, Gift, Home, CheckCircle2, Lock, Users, Edit3, Plus,
-  Trash2, ChevronDown, Navigation, Calendar, ArrowUpRight
+  Trash2, ChevronDown, Navigation, ArrowUpRight, HelpCircle, Car, X, UserPlus
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -19,8 +19,13 @@ const NAV_LINKS = [
   { id: 'hjem', label: 'Hjem' },
   { id: 'program', label: 'Program' },
   { id: 'rejse', label: 'Find vej' },
+  { id: 'praktisk', label: 'Praktisk' },
   { id: 'su', label: 'S.U.' },
 ];
+
+// Tomme rækker til S.U.-formularen (per-gæst navn + allergi)
+const emptyGuest = () => ({ name: '', diet: '' });
+const emptyRsvp = () => ({ name: '', attending: 'yes', guests: [emptyGuest()], message: '' });
 
 // --- SCROLL REVEAL (IntersectionObserver + spring-eased CSS) ---
 const Reveal = ({ children, delay = 0, className = '' }) => {
@@ -254,9 +259,18 @@ function Nav({ names }) {
 
 // --- LANDING PAGE ---
 function LandingPage({ data, user }) {
-  const [rsvpForm, setRsvpForm] = useState({ name: '', attending: 'yes', diet: '', message: '' });
+  const [rsvpForm, setRsvpForm] = useState(emptyRsvp);
   const [rsvpStatus, setRsvpStatus] = useState('idle');
   const [heroOffset, setHeroOffset] = useState(0);
+
+  // Hjælpere til per-gæst-listen i S.U.-formularen
+  const setGuest = (i, patch) => {
+    const guests = rsvpForm.guests.map((g, idx) => (idx === i ? { ...g, ...patch } : g));
+    setRsvpForm({ ...rsvpForm, guests });
+  };
+  const addGuest = () => setRsvpForm({ ...rsvpForm, guests: [...rsvpForm.guests, emptyGuest()] });
+  const removeGuest = (i) =>
+    setRsvpForm({ ...rsvpForm, guests: rsvpForm.guests.filter((_, idx) => idx !== i) });
 
   // Subtle hero parallax (respect reduced motion)
   useEffect(() => {
@@ -276,9 +290,21 @@ function LandingPage({ data, user }) {
     setRsvpStatus('submitting');
     try {
       const rsvpsRef = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_rsvps');
-      await addDoc(rsvpsRef, { ...rsvpForm, timestamp: new Date().toISOString() });
+      // Kun gæster med et navn tælles med; ved afbud gemmes ingen gæsteliste.
+      const guests =
+        rsvpForm.attending === 'yes'
+          ? rsvpForm.guests.filter((g) => g.name.trim())
+          : [];
+      await addDoc(rsvpsRef, {
+        name: rsvpForm.name.trim(),
+        attending: rsvpForm.attending,
+        guests,
+        guestCount: guests.length,
+        message: rsvpForm.message.trim(),
+        timestamp: new Date().toISOString(),
+      });
       setRsvpStatus('success');
-      setRsvpForm({ name: '', attending: 'yes', diet: '', message: '' });
+      setRsvpForm(emptyRsvp());
     } catch (error) {
       console.error("Fejl ved afsendelse af S.U.:", error);
       setRsvpStatus('idle');
@@ -456,6 +482,19 @@ function LandingPage({ data, user }) {
           </Reveal>
         </section>
 
+        {/* ---------- PRAKTISK: FAQ + SAMKØRSEL ---------- */}
+        <section id="praktisk">
+          <Reveal>
+            <SectionHeading icon={HelpCircle} kicker="Godt at vide" title="Praktisk & FAQ" />
+          </Reveal>
+          <div className="mt-12">
+            <FAQSection items={data.faq} />
+          </div>
+          <div className="mt-16">
+            <Carpool user={user} />
+          </div>
+        </section>
+
         {/* ---------- S.U. ---------- */}
         <section id="su">
           <Reveal>
@@ -476,14 +515,14 @@ function LandingPage({ data, user }) {
                   </div>
                 ) : (
                   <form onSubmit={handleRsvpSubmit} className="max-w-md mx-auto space-y-5 text-left">
-                    <Field label="Navn(e)">
+                    <Field label="Hvem svarer? (kontaktperson)">
                       <input
                         required
                         type="text"
                         value={rsvpForm.name}
                         onChange={(e) => setRsvpForm({ ...rsvpForm, name: e.target.value })}
                         className="dark-input"
-                        placeholder="Fulde navn på alle gæster"
+                        placeholder="Dit navn"
                       />
                     </Field>
                     <Field label="Deltager I?">
@@ -508,14 +547,44 @@ function LandingPage({ data, user }) {
                       </div>
                     </Field>
                     {rsvpForm.attending === 'yes' && (
-                      <Field label="Allergier eller diæt? (valgfrit)">
-                        <input
-                          type="text"
-                          value={rsvpForm.diet}
-                          onChange={(e) => setRsvpForm({ ...rsvpForm, diet: e.target.value })}
-                          className="dark-input"
-                          placeholder="F.eks. vegetar, nøddeallergi"
-                        />
+                      <Field label="Hvem kommer? (navn + evt. allergi pr. person)">
+                        <div className="space-y-2.5">
+                          {rsvpForm.guests.map((g, i) => (
+                            <div key={i} className="flex gap-2 items-center">
+                              <input
+                                type="text"
+                                value={g.name}
+                                onChange={(e) => setGuest(i, { name: e.target.value })}
+                                className="dark-input flex-1"
+                                placeholder={`Gæst ${i + 1}`}
+                              />
+                              <input
+                                type="text"
+                                value={g.diet}
+                                onChange={(e) => setGuest(i, { diet: e.target.value })}
+                                className="dark-input flex-1"
+                                placeholder="Allergi/diæt"
+                              />
+                              {rsvpForm.guests.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeGuest(i)}
+                                  aria-label="Fjern gæst"
+                                  className="btn-press shrink-0 text-ivory/50 hover:text-white p-2"
+                                >
+                                  <X size={16} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addGuest}
+                          className="btn-press mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-gold-soft hover:text-white"
+                        >
+                          <UserPlus size={15} /> Tilføj gæst
+                        </button>
                       </Field>
                     )}
                     <Field label="En lille hilsen (valgfrit)">
@@ -622,6 +691,170 @@ function MapCard({ label, name, address, delay = 0 }) {
   );
 }
 
+// --- FAQ ACCORDION ---
+function FAQSection({ items = [] }) {
+  const [open, setOpen] = useState(null);
+  if (!items.length) return null;
+  return (
+    <div className="max-w-2xl mx-auto border-y border-line">
+      {items.map((it, i) => {
+        const isOpen = open === i;
+        return (
+          <Reveal key={it.id ?? i} delay={i * 60}>
+            <div className="border-b border-line last:border-b-0">
+              <button
+                onClick={() => setOpen(isOpen ? null : i)}
+                aria-expanded={isOpen}
+                className="btn-press w-full flex items-center justify-between gap-4 py-5 text-left"
+              >
+                <span className="font-serif text-xl md:text-2xl text-ink">{it.q}</span>
+                <ChevronDown
+                  size={20}
+                  className={`shrink-0 text-gold transition-transform duration-300 ease-spring ${isOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              <div className={`grid transition-all duration-300 ease-spring ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                <div className="overflow-hidden">
+                  <p className="text-ink-soft font-light leading-relaxed pb-6 pr-8">{it.a}</p>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+        );
+      })}
+    </div>
+  );
+}
+
+// --- SAMKØRSEL (CARPOOL BOARD) ---
+const carpoolInput =
+  "w-full bg-white border border-line rounded-xl p-2.5 text-sm outline-none focus:border-gold transition-colors";
+
+const CarpoolList = ({ title, rows, emptyText }) => (
+  <div>
+    <p className="text-[0.7rem] uppercase tracking-widest2 text-gold mb-3">{title}</p>
+    {rows.length === 0 ? (
+      <p className="text-ink-faint font-light text-sm">{emptyText}</p>
+    ) : (
+      <ul className="space-y-3">
+        {rows.map((p) => (
+          <li key={p.id} className="bg-white border border-line rounded-xl p-3.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-medium text-ink">{p.name}</span>
+              {p.seats && <span className="text-xs text-sage font-medium">{p.seats} pladser</span>}
+            </div>
+            <p className="text-ink-soft font-light text-sm mt-0.5">{p.area}</p>
+            {p.contact && <p className="text-ink-faint text-xs mt-1">{p.contact}</p>}
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
+);
+
+function Carpool({ user }) {
+  const [posts, setPosts] = useState([]);
+  const [form, setForm] = useState({ name: '', direction: 'offer', area: '', seats: '', contact: '' });
+  const [status, setStatus] = useState('idle');
+
+  useEffect(() => {
+    if (!user) return;
+    const ref = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_carpool');
+    const unsub = onSnapshot(ref, (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      setPosts(rows);
+    }, (e) => console.error("Fejl ved hentning af samkørsel:", e));
+    return () => unsub();
+  }, [user]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!user || !form.name.trim() || !form.area.trim()) return;
+    setStatus('submitting');
+    try {
+      const ref = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_carpool');
+      await addDoc(ref, {
+        name: form.name.trim(),
+        direction: form.direction,
+        area: form.area.trim(),
+        seats: form.direction === 'offer' ? form.seats.trim() : '',
+        contact: form.contact.trim(),
+        timestamp: new Date().toISOString(),
+      });
+      setForm({ name: '', direction: 'offer', area: '', seats: '', contact: '' });
+      setStatus('idle');
+    } catch (err) {
+      console.error("Fejl ved opslag:", err);
+      setStatus('idle');
+    }
+  };
+
+  const offers = posts.filter((p) => p.direction === 'offer');
+  const needs = posts.filter((p) => p.direction === 'need');
+
+  return (
+    <Reveal>
+      <div className="bg-ivory-100 border border-line rounded-3xl shadow-soft p-8 md:p-12">
+        <div className="text-center mb-8">
+          <Car className="mx-auto text-gold mb-4" size={28} strokeWidth={1.4} />
+          <h3 className="font-serif text-3xl text-ink">Samkørsel</h3>
+          <div className="rule mt-4 mx-auto" />
+          <p className="text-ink-soft font-light mt-5 max-w-lg mx-auto">
+            Sans & Samling ligger lidt afsides — hjælp hinanden frem og hjem. Tilbyd en plads i bilen, eller søg et lift.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-8 mb-10">
+          <CarpoolList title="Tilbyder plads" rows={offers} emptyText="Ingen tilbud endnu — vær den første." />
+          <CarpoolList title="Søger plads" rows={needs} emptyText="Ingen søger lige nu." />
+        </div>
+
+        <form onSubmit={submit} className="border-t border-line pt-8 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { v: 'offer', t: 'Jeg tilbyder plads' },
+              { v: 'need', t: 'Jeg søger plads' },
+            ].map((o) => (
+              <button
+                key={o.v}
+                type="button"
+                onClick={() => setForm({ ...form, direction: o.v })}
+                className={`btn-press rounded-xl py-2.5 text-sm font-medium border ${
+                  form.direction === o.v
+                    ? 'bg-ink text-white border-transparent'
+                    : 'bg-white text-ink-soft border-line hover:border-gold'
+                }`}
+              >
+                {o.t}
+              </button>
+            ))}
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <input className={carpoolInput} required placeholder="Dit navn"
+              value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input className={carpoolInput} required placeholder="Til/fra hvor? (fx fra Aarhus)"
+              value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
+            {form.direction === 'offer' && (
+              <input className={carpoolInput} placeholder="Antal ledige pladser"
+                value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} />
+            )}
+            <input className={carpoolInput} placeholder="Kontakt (tlf./mail) — valgfrit"
+              value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+          </div>
+          <button
+            type="submit"
+            disabled={status === 'submitting'}
+            className="btn-press w-full sm:w-auto bg-gold text-white font-medium px-6 py-2.5 rounded-xl hover:bg-gold-deep disabled:opacity-50"
+          >
+            {status === 'submitting' ? 'Slår op...' : 'Slå op'}
+          </button>
+        </form>
+      </div>
+    </Reveal>
+  );
+}
+
 // --- ADMIN PAGE ---
 function AdminPage({ data, user }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -673,7 +906,7 @@ function AdminPage({ data, user }) {
             <Lock className="text-gold" size={24} strokeWidth={1.5} />
           </div>
           <h2 className="font-serif text-3xl text-ink mb-1">Admin</h2>
-          <p className="text-ink-faint font-light text-sm mb-6">Anna &amp; Christian</p>
+          <p className="text-ink-faint font-light text-sm mb-6">{data.names}</p>
           <input
             type="password"
             placeholder="Adgangskode"
@@ -695,7 +928,13 @@ function AdminPage({ data, user }) {
     );
   }
 
-  const goingCount = rsvps.filter((r) => r.attending === 'yes').length;
+  // Bagudkompatibel: gamle svar har kun name/diet, nye har en guests-liste.
+  const guestsOf = (r) =>
+    r.guests?.length ? r.guests : (r.name ? [{ name: r.name, diet: r.diet || '' }] : []);
+  const countOf = (r) => r.guestCount ?? guestsOf(r).length;
+  const attendingPeople = rsvps
+    .filter((r) => r.attending === 'yes')
+    .reduce((sum, r) => sum + countOf(r), 0);
   const notCount = rsvps.filter((r) => r.attending === 'no').length;
 
   return (
@@ -806,6 +1045,32 @@ function AdminPage({ data, user }) {
                   Tilføj ønske
                 </AddButton>
               </AdminGroup>
+
+              <AdminGroup title="Praktisk / FAQ">
+                {(formData.faq || []).map((item, index) => (
+                  <div key={item.id} className="bg-white p-3 rounded-xl border border-line space-y-2">
+                    <div className="flex gap-2 items-start">
+                      <input className="flex-1 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold font-medium" placeholder="Spørgsmål"
+                        value={item.q}
+                        onChange={(e) => {
+                          const f = [...formData.faq]; f[index] = { ...f[index], q: e.target.value }; set({ faq: f });
+                        }} />
+                      <button onClick={() => set({ faq: formData.faq.filter((_, i) => i !== index) })}
+                        className="p-2 text-ink-faint hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <textarea rows={2} className="w-full border border-line rounded-lg p-2 text-sm outline-none focus:border-gold resize-none" placeholder="Svar"
+                      value={item.a}
+                      onChange={(e) => {
+                        const f = [...formData.faq]; f[index] = { ...f[index], a: e.target.value }; set({ faq: f });
+                      }} />
+                  </div>
+                ))}
+                <AddButton onClick={() => set({ faq: [...(formData.faq || []), { id: Date.now(), q: "", a: "" }] })}>
+                  Tilføj spørgsmål
+                </AddButton>
+              </AdminGroup>
             </div>
           )}
 
@@ -813,36 +1078,52 @@ function AdminPage({ data, user }) {
             <div className="space-y-6">
               <h1 className="text-3xl font-serif text-ink border-b border-line pb-5">S.U. besvarelser</h1>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <StatCard tone="sage" label="Deltager" value={goingCount} />
-                <StatCard tone="blush" label="Deltager ikke" value={notCount} />
-                <StatCard tone="ink" label="Besvarelser i alt" value={rsvps.length} />
+                <StatCard tone="sage" label="Gæster i alt" value={attendingPeople} />
+                <StatCard tone="blush" label="Afbud" value={notCount} />
+                <StatCard tone="ink" label="Besvarelser" value={rsvps.length} />
               </div>
 
               <div className="bg-white border border-line rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm min-w-[560px]">
+                  <table className="w-full text-left text-sm min-w-[640px]">
                     <thead className="bg-ivory-200/60 border-b border-line">
                       <tr>
-                        {['Navn', 'Status', 'Allergi / diæt', 'Hilsen'].map((h) => (
+                        {['Svar fra', 'Status', 'Antal', 'Deltagere & allergi', 'Hilsen'].map((h) => (
                           <th key={h} className="p-4 font-medium text-ink-soft">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
                       {rsvps.length === 0 ? (
-                        <tr><td colSpan="4" className="p-10 text-center text-ink-faint font-light">Ingen besvarelser endnu.</td></tr>
-                      ) : rsvps.map((rsvp) => (
-                        <tr key={rsvp.id} className="hover:bg-ivory-200/40 transition-colors">
-                          <td className="p-4 font-medium text-ink">{rsvp.name}</td>
-                          <td className="p-4">
-                            {rsvp.attending === 'yes'
-                              ? <span className="bg-sage/15 text-sage px-2.5 py-1 rounded-full text-xs font-medium">Deltager</span>
-                              : <span className="bg-red-100 text-red-600 px-2.5 py-1 rounded-full text-xs font-medium">Afbud</span>}
-                          </td>
-                          <td className="p-4 text-ink-soft">{rsvp.diet || '—'}</td>
-                          <td className="p-4 text-ink-soft max-w-xs truncate" title={rsvp.message}>{rsvp.message || '—'}</td>
-                        </tr>
-                      ))}
+                        <tr><td colSpan="5" className="p-10 text-center text-ink-faint font-light">Ingen besvarelser endnu.</td></tr>
+                      ) : rsvps.map((rsvp) => {
+                        const guests = guestsOf(rsvp);
+                        const going = rsvp.attending === 'yes';
+                        return (
+                          <tr key={rsvp.id} className="hover:bg-ivory-200/40 transition-colors align-top">
+                            <td className="p-4 font-medium text-ink">{rsvp.name}</td>
+                            <td className="p-4">
+                              {going
+                                ? <span className="bg-sage/15 text-sage px-2.5 py-1 rounded-full text-xs font-medium">Deltager</span>
+                                : <span className="bg-red-100 text-red-600 px-2.5 py-1 rounded-full text-xs font-medium">Afbud</span>}
+                            </td>
+                            <td className="p-4 text-ink-soft">{going ? countOf(rsvp) : '—'}</td>
+                            <td className="p-4 text-ink-soft">
+                              {going && guests.length ? (
+                                <ul className="space-y-1">
+                                  {guests.map((g, i) => (
+                                    <li key={i}>
+                                      {g.name || '—'}
+                                      {g.diet && <span className="text-ink-faint"> · {g.diet}</span>}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : '—'}
+                            </td>
+                            <td className="p-4 text-ink-soft max-w-xs truncate" title={rsvp.message}>{rsvp.message || '—'}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
