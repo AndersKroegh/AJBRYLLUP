@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Heart, MapPin, Clock, Gift, Home, CheckCircle2, Lock, Users, Edit3, Plus,
-  Trash2, ChevronDown, Navigation, ArrowUpRight, HelpCircle, Car, X, UserPlus
+  Trash2, ChevronDown, Navigation, ArrowUpRight, HelpCircle, Car, X, UserPlus,
+  CalendarPlus, Download, ExternalLink
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -9,6 +10,8 @@ import {
   getFirestore, doc, setDoc, collection, addDoc, onSnapshot, updateDoc
 } from 'firebase/firestore';
 import { firebaseConfig, appId, DEFAULT_DATA } from './weddingConfig';
+import IntroOverlay from './IntroOverlay';
+import { buildCalendar, downloadIcs } from './calendar';
 
 // --- FIREBASE SETUP ---
 const app = initializeApp(firebaseConfig);
@@ -154,6 +157,22 @@ export default function App() {
   const [weddingData, setWeddingData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState('landing');
+  // Intro vises kun én gang pr. browser-session (og aldrig på admin-siden).
+  const [showIntro, setShowIntro] = useState(() => {
+    try { return sessionStorage.getItem('aj-intro-seen') !== '1'; } catch { return true; }
+  });
+  const introActive = showIntro && currentView === 'landing' && !!weddingData;
+
+  // Lås scroll mens introen kører.
+  useEffect(() => {
+    document.body.style.overflow = introActive ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [introActive]);
+
+  const dismissIntro = () => {
+    try { sessionStorage.setItem('aj-intro-seen', '1'); } catch { /* ignore */ }
+    setShowIntro(false);
+  };
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -196,7 +215,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-ivory">
         <div className="animate-pulse text-ink-faint font-serif text-2xl tracking-widest2">
-          Anna &amp; Christian
+          Et øjeblik &hellip;
         </div>
       </div>
     );
@@ -204,6 +223,14 @@ export default function App() {
 
   return (
     <div className="font-sans text-ink bg-ivory min-h-screen overflow-x-hidden selection:bg-blush selection:text-ink">
+      {introActive && (
+        <IntroOverlay
+          names={weddingData.names}
+          subtitle={weddingData.intro}
+          date={weddingData.date}
+          onDone={dismissIntro}
+        />
+      )}
       {currentView === 'landing'
         ? <LandingPage data={weddingData} user={user} />
         : <AdminPage data={weddingData} user={user} />}
@@ -350,6 +377,9 @@ function LandingPage({ data, user }) {
           </Reveal>
           <Reveal delay={450} className="mt-12">
             <Countdown target={data.eventDate} light />
+          </Reveal>
+          <Reveal delay={650} className="mt-10">
+            <AddToCalendar data={data} />
           </Reveal>
         </div>
 
@@ -654,6 +684,55 @@ const Field = ({ label, children }) => (
     {children}
   </div>
 );
+
+// --- TILFØJ TIL KALENDER ---
+function AddToCalendar({ data }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const cal = buildCalendar(data);
+
+  useEffect(() => {
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('click', onDoc);
+    return () => document.removeEventListener('click', onDoc);
+  }, []);
+
+  if (!cal) return null;
+
+  const item = "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-ink text-left hover:bg-ivory-200 transition-colors";
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="btn-press inline-flex items-center gap-2 text-sm font-light tracking-wide text-white/90 border border-white/35 rounded-full px-5 py-2.5 backdrop-blur-sm hover:bg-white/10"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <CalendarPlus size={16} /> Tilføj til kalender
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-1/2 -translate-x-1/2 mt-2 w-60 bg-ivory-100 border border-line rounded-2xl shadow-lift p-1.5 z-20 animate-fade-up"
+        >
+          <a href={cal.googleUrl} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={item} role="menuitem">
+            <ExternalLink size={16} className="text-gold" /> Google Kalender
+          </a>
+          <button
+            type="button"
+            onClick={() => { downloadIcs(cal.ics, 'anders-og-julie-bryllup.ics'); setOpen(false); }}
+            className={item}
+            role="menuitem"
+          >
+            <Download size={16} className="text-gold" /> Apple / Outlook (.ics)
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // --- MAP CARD (no API key — Google Maps embed) ---
 function MapCard({ label, name, address, delay = 0 }) {
