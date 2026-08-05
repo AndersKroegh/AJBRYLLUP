@@ -1,3 +1,91 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Elegant serif display gets tighter tracking as it grows (Apple type rule) */
+  .font-serif {
+    font-optical-sizing: auto;
+  }
+
+  /* Sticky-nav offset so anchored sections aren't hidden under the bar */
+  section[id] {
+    scroll-margin-top: 96px;
+  }
+}
+
+@layer components {
+  /* Translucent chrome — content scrolls underneath */
+  .glass {
+    background: rgba(251, 248, 243, 0.72);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+  }
+
+  /* Hairline gold divider used under section headings */
+  .rule {
+    height: 1px;
+    width: 3rem;
+    background: linear-gradient(90deg, transparent, #B08D57, transparent);
+  }
+
+  .btn-press {
+    transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      background-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+  }
+  .btn-press:active {
+    transform: scale(0.975);
+  }
+}
+
+@layer utilities {
+  .text-shadow-soft {
+    text-shadow: 0 2px 30px rgba(0, 0, 0, 0.35);
+  }
+  /* Vertical film-grain-free vignette for hero legibility */
+  .hero-scrim {
+    background: linear-gradient(
+      to bottom,
+      rgba(28, 24, 20, 0.28) 0%,
+      rgba(28, 24, 20, 0.12) 35%,
+      rgba(28, 24, 20, 0.28) 75%,
+      rgba(28, 24, 20, 0.55) 100%
+    );
+  }
+}
+
+/* Reduced motion: gentle cross-fades, no travel or looping float */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 200ms !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: #fbf8f3;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

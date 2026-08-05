@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// Sikkerhedsregler for bryllupssiden (Firestore).
+// Appen logger gæster ind anonymt (signInAnonymously), så request.auth
+// er sat for alle rigtige besøgende. Vi tillader adgang til det offentlige
+// bryllupsdata, men blokerer sletning og alt uden for den sti.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Offentligt bryllupsdata: indhold (wedding_info) + S.U.-svar (wedding_rsvps)
+    // Sti: artifacts/{appId}/public/data/{...}
+    match /artifacts/{appId}/public/data/{document=**} {
+      // Alle (anonymt indloggede) må læse indhold og se S.U.-svar (admin),
+      // oprette S.U.-svar (gæster) og opdatere indhold (admin gemmer ændringer).
+      allow read, create, update: if request.auth != null;
+
+      // Ingen må slette data via klienten.
+      allow delete: if false;
+    }
+
+    // Alt andet er som udgangspunkt lukket.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

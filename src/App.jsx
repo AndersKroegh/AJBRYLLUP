@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MapPin, Clock, Gift, Home, CheckCircle2, Lock, Users, Edit3, Plus, Trash2, ChevronDown } from 'lucide-react';
+import {
+  Heart, MapPin, Clock, Gift, Home, CheckCircle2, Lock, Users, Edit3, Plus,
+  Trash2, ChevronDown, Navigation, Calendar, ArrowUpRight
+} from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, onSnapshot, updateDoc, query, orderBy } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import {
+  getFirestore, doc, setDoc, collection, addDoc, onSnapshot, updateDoc
+} from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
 const firebaseConfig = {
@@ -17,56 +22,70 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = 'bryllups-website-app'; // Unikt ID til din database
+const appId = 'bryllups-website-app';
 
-// Default Data hvis databasen er tom
+// Default Data hvis databasen er tom (nye felter merges også ind over gammel data)
 const DEFAULT_DATA = {
-  names: "Anna & Christian",
-  date: "15. August 2026",
-  rsvpDate: "1. Maj 2026",
-  heroImage: "https://images.unsplash.com/photo-1519741497674-611481863552?ixlib=rb-1.2.1&auto=format&fit=crop&w=2000&q=80",
-  timeAndPlace: "Vielsen finder sted kl. 13:00 i Risskov Kirke. Herefter inviterer vi til en festlig reception og en uforglemmelig aften på Varna Palæet.",
-  accommodation: "Vi har forhåndsreserveret en række værelser på Hotel Marselis til en særpris. Nævn venligst 'Anna & Christian Bryllup' ved booking.",
+  names: "Anders & Julie",
+  date: "10. juli 2027",
+  eventDate: "2027-07-10T13:00:00", // Bruges til nedtælling (ISO) — ret tidspunktet i admin
+  rsvpDate: "1. maj 2027",
+  heroImage: "https://images.unsplash.com/photo-1519741497674-611481863552?ixlib=rb-1.2.1&auto=format&fit=crop&w=2400&q=80",
+  intro: "Vi har ventet på denne dag, og nu er den her. Kom og fejr vores bryllup sammen med os — midt i den smukke natur ved Ejstrupholm.",
+  timeAndPlace: "Vi skal giftes på Sans & Samling, en unik eventlokation omgivet af skov og hede ved Ejstrupholm. Både vielse, reception og festen om aftenen holdes samme sted, så I bare kan slappe af og nyde dagen.",
+  accommodation: "Sans & Samling tilbyder overnatning på selve stedet, så I kan blive og feste med os hele aftenen. Giv os gerne besked, hvis I ønsker at overnatte, så hjælper vi med det praktiske.",
+  ceremonyName: "Sans & Samling",
+  ceremonyAddress: "Ikastvej 7, 7361 Ejstrupholm",
+  venueName: "Sans & Samling",
+  venueAddress: "Ikastvej 7, 7361 Ejstrupholm",
   program: [
-    { id: 1, time: "13:00", event: "Vielse i Risskov Kirke" },
+    { id: 1, time: "13:00", event: "Vielse" },
     { id: 2, time: "15:00", event: "Reception & Bryllupskage" },
     { id: 3, time: "18:00", event: "Middag & Fest" },
     { id: 4, time: "23:30", event: "Brudevals" }
   ],
   wishlist: [
-    { id: 1, item: "Oplevelser & Rejsegavekort", link: "" },
-    { id: 2, item: "Gavekort til Illums Bolighus", link: "https://illumsbolighus.dk" },
-    { id: 3, item: "Royal Copenhagen Mega Mussel kopper", link: "" }
+    { id: 1, item: "Oplevelser & rejsegavekort", link: "" },
+    { id: 2, item: "Bidrag til bryllupsrejsen", link: "" },
+    { id: 3, item: "Gavekort til hjemmet", link: "" }
   ]
 };
 
-// --- HJÆLPE HOOK TIL SCROLL ANIMATION ---
-const FadeInSection = ({ children, delay = 0 }) => {
-  const [isVisible, setVisible] = useState(false);
-  const domRef = useRef();
+const NAV_LINKS = [
+  { id: 'hjem', label: 'Hjem' },
+  { id: 'program', label: 'Program' },
+  { id: 'rejse', label: 'Find vej' },
+  { id: 'su', label: 'S.U.' },
+];
+
+// --- SCROLL REVEAL (IntersectionObserver + spring-eased CSS) ---
+const Reveal = ({ children, delay = 0, className = '' }) => {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef();
 
   useEffect(() => {
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.1 });
-    
-    if (domRef.current) observer.observe(domRef.current);
-    return () => {
-      if (domRef.current) observer.unobserve(domRef.current);
-    };
+    const node = ref.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setVisible(true);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
+    );
+    if (node) observer.observe(node);
+    return () => { if (node) observer.unobserve(node); };
   }, []);
 
   return (
     <div
-      ref={domRef}
-      className={`transition-all duration-1000 ease-out transform ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
-      }`}
+      ref={ref}
+      className={`transition-all duration-[900ms] ease-spring will-change-[transform,opacity] ${
+        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+      } ${className}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
       {children}
@@ -74,15 +93,99 @@ const FadeInSection = ({ children, delay = 0 }) => {
   );
 };
 
+// --- LIVE COUNTDOWN ---
+function getRemaining(target) {
+  const diff = new Date(target).getTime() - Date.now();
+  if (isNaN(diff)) return null;
+  if (diff <= 0) return { done: true, days: 0, hours: 0, minutes: 0, seconds: 0 };
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+  return { done: false, days, hours, minutes, seconds };
+}
 
-// --- MAIN APP COMPONENT ---
+const Countdown = ({ target, light = false }) => {
+  const [t, setT] = useState(() => getRemaining(target));
+  useEffect(() => {
+    const tick = () => setT(getRemaining(target));
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [target]);
+
+  if (!t) return null;
+
+  const numCls = light ? 'text-white' : 'text-ink';
+  const labelCls = light ? 'text-white/70' : 'text-ink-faint';
+  const sepCls = light ? 'text-white/40' : 'text-gold/50';
+
+  if (t.done) {
+    return (
+      <p className={`font-serif text-2xl md:text-3xl ${numCls}`}>
+        I dag fejrer vi kærligheden ♥
+      </p>
+    );
+  }
+
+  const units = [
+    { v: t.days, l: 'Dage' },
+    { v: t.hours, l: 'Timer' },
+    { v: t.minutes, l: 'Min.' },
+    { v: t.seconds, l: 'Sek.' },
+  ];
+
+  return (
+    <div className="flex items-end justify-center gap-3 sm:gap-6">
+      {units.map((u, i) => (
+        <React.Fragment key={u.l}>
+          <div className="flex flex-col items-center min-w-[3.2rem] sm:min-w-[4.5rem]">
+            <span
+              className={`font-serif tabular-nums leading-none text-4xl sm:text-6xl ${numCls}`}
+              style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}
+            >
+              {String(u.v).padStart(2, '0')}
+            </span>
+            <span className={`mt-2 text-[0.62rem] sm:text-xs uppercase tracking-widest2 ${labelCls}`}>
+              {u.l}
+            </span>
+          </div>
+          {i < units.length - 1 && (
+            <span className={`font-serif text-3xl sm:text-5xl leading-none pb-6 ${sepCls}`}>·</span>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
+
+// --- SECTION HEADING ---
+const SectionHeading = ({ icon: Icon, kicker, title, align = 'center' }) => (
+  <div className={align === 'center' ? 'text-center' : 'text-left'}>
+    {Icon && (
+      <Icon
+        className={`${align === 'center' ? 'mx-auto' : ''} text-gold mb-5`}
+        size={30}
+        strokeWidth={1.25}
+      />
+    )}
+    {kicker && (
+      <p className="text-[0.7rem] uppercase tracking-widest2 text-ink-faint mb-3">{kicker}</p>
+    )}
+    <h2 className="font-serif text-4xl md:text-5xl text-ink" style={{ letterSpacing: '-0.015em' }}>
+      {title}
+    </h2>
+    <div className={`rule mt-5 ${align === 'center' ? 'mx-auto' : ''}`} />
+  </div>
+);
+
+// --- MAIN APP ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [weddingData, setWeddingData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState('landing'); // 'landing' | 'admin'
+  const [currentView, setCurrentView] = useState('landing');
 
-  // Håndter rute via hash (simpel routing for single-file)
   useEffect(() => {
     const handleHashChange = () => {
       setCurrentView(window.location.hash === '#/admin' ? 'admin' : 'landing');
@@ -92,71 +195,116 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Firebase Auth Init
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        await signInAnonymously(auth);
-      } catch (error) {
-        console.error("Auth error:", error);
-      }
-    };
-    initAuth();
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-    });
+    signInAnonymously(auth).catch((error) => console.error("Auth error:", error));
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
   }, []);
 
-  // Hent bryllupsdata
   useEffect(() => {
     if (!user) return;
-
     const infoDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'wedding_info', 'main');
-
     const unsubscribe = onSnapshot(infoDocRef, async (docSnap) => {
       if (docSnap.exists()) {
-        setWeddingData(docSnap.data());
+        // Merge så nye felter (nedtælling, kort m.m.) altid har en værdi
+        setWeddingData({ ...DEFAULT_DATA, ...docSnap.data() });
       } else {
-        // Opret standard data hvis det ikke findes endnu
         await setDoc(infoDocRef, DEFAULT_DATA);
         setWeddingData(DEFAULT_DATA);
       }
       setLoading(false);
     }, (error) => {
+      // Hvis databasen ikke kan læses (fx rettigheder/offline), vis stadig siden
+      // med standardindhold, så gæster aldrig møder en evig "Indlæser..."-skærm.
       console.error("Fejl ved hentning af data:", error);
+      setWeddingData((prev) => prev ?? DEFAULT_DATA);
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, [user]);
 
   if (loading || !weddingData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
-        <div className="animate-pulse text-stone-400 font-serif text-xl tracking-widest">
-          Indlæser...
+      <div className="min-h-screen flex items-center justify-center bg-ivory">
+        <div className="animate-pulse text-ink-faint font-serif text-2xl tracking-widest2">
+          Anna &amp; Christian
         </div>
       </div>
     );
   }
 
   return (
-    <div className="font-sans text-stone-800 bg-[#FAFAFA] min-h-screen overflow-x-hidden selection:bg-stone-200">
-      {currentView === 'landing' ? (
-        <LandingPage data={weddingData} user={user} />
-      ) : (
-        <AdminPage data={weddingData} user={user} />
-      )}
+    <div className="font-sans text-ink bg-ivory min-h-screen overflow-x-hidden selection:bg-blush selection:text-ink">
+      {currentView === 'landing'
+        ? <LandingPage data={weddingData} user={user} />
+        : <AdminPage data={weddingData} user={user} />}
     </div>
   );
 }
 
-// --- LANDING PAGE KOMPONENT ---
+// --- TRANSLUCENT NAV ---
+function Nav({ names }) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const initials = names.split('&').map(s => s.trim()[0]).filter(Boolean).join(' & ');
+
+  return (
+    <header
+      className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ease-spring ${
+        scrolled ? 'glass shadow-glass py-3' : 'py-5'
+      }`}
+    >
+      <nav className="max-w-6xl mx-auto px-6 flex items-center justify-between">
+        <a
+          href="#hjem"
+          className={`font-serif text-xl tracking-wide transition-colors ${
+            scrolled ? 'text-ink' : 'text-white text-shadow-soft'
+          }`}
+        >
+          {initials}
+        </a>
+        <ul className="flex items-center gap-6 sm:gap-8">
+          {NAV_LINKS.map((l) => (
+            <li key={l.id}>
+              <a
+                href={`#${l.id}`}
+                className={`text-sm font-light tracking-wide transition-colors hover:text-gold ${
+                  scrolled ? 'text-ink-soft' : 'text-white/90 text-shadow-soft'
+                }`}
+              >
+                {l.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </header>
+  );
+}
+
+// --- LANDING PAGE ---
 function LandingPage({ data, user }) {
   const [rsvpForm, setRsvpForm] = useState({ name: '', attending: 'yes', diet: '', message: '' });
-  const [rsvpStatus, setRsvpStatus] = useState('idle'); // idle, submitting, success
+  const [rsvpStatus, setRsvpStatus] = useState('idle');
+  const [heroOffset, setHeroOffset] = useState(0);
+
+  // Subtle hero parallax (respect reduced motion)
+  useEffect(() => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+    let raf = 0;
+    const onScroll = () => {
+      raf = requestAnimationFrame(() => setHeroOffset(Math.min(window.scrollY * 0.35, 260)));
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
+  }, []);
 
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
@@ -164,10 +312,7 @@ function LandingPage({ data, user }) {
     setRsvpStatus('submitting');
     try {
       const rsvpsRef = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_rsvps');
-      await addDoc(rsvpsRef, {
-        ...rsvpForm,
-        timestamp: new Date().toISOString()
-      });
+      await addDoc(rsvpsRef, { ...rsvpForm, timestamp: new Date().toISOString() });
       setRsvpStatus('success');
       setRsvpForm({ name: '', attending: 'yes', diet: '', message: '' });
     } catch (error) {
@@ -178,100 +323,164 @@ function LandingPage({ data, user }) {
 
   return (
     <div>
-      {/* Hero Section */}
-      <div className="relative h-screen min-h-[600px] flex items-center justify-center">
+      <Nav names={data.names} />
+
+      {/* ---------- HERO ---------- */}
+      <section id="hjem" className="relative h-[100svh] min-h-[620px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img 
-            src={data.heroImage} 
-            alt="Wedding Cover" 
-            className="w-full h-full object-cover opacity-90"
-            loading="lazy"
+          <img
+            src={data.heroImage}
+            alt=""
+            className="w-full h-[120%] object-cover"
+            style={{ transform: `translateY(${heroOffset}px) scale(1.05)` }}
           />
-          <div className="absolute inset-0 bg-stone-900/40 mix-blend-multiply"></div>
+          <div className="absolute inset-0 hero-scrim" />
         </div>
-        
-        <div className="relative z-10 text-center text-white px-4">
-          <FadeInSection>
-            <p className="tracking-[0.3em] uppercase text-sm md:text-base mb-6 font-light">Vi skal giftes</p>
-          </FadeInSection>
-          <FadeInSection delay={200}>
-            <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl mb-6 font-medium">
+
+        <div className="relative z-10 text-center text-white px-6 max-w-3xl">
+          <Reveal>
+            <p className="tracking-widest2 uppercase text-xs md:text-sm mb-6 font-light text-white/85">
+              Vi skal giftes
+            </p>
+          </Reveal>
+          <Reveal delay={150}>
+            <h1
+              className="font-serif text-6xl md:text-8xl lg:text-9xl mb-6 font-medium text-shadow-soft"
+              style={{ letterSpacing: '-0.02em', lineHeight: 1.02 }}
+            >
               {data.names}
             </h1>
-          </FadeInSection>
-          <FadeInSection delay={400}>
-            <p className="text-xl md:text-2xl font-light tracking-wider">
+          </Reveal>
+          <Reveal delay={300}>
+            <div className="flex items-center justify-center gap-4 text-lg md:text-xl font-light tracking-wide text-white/90">
+              <span className="w-8 h-px bg-white/40" />
               {data.date}
-            </p>
-          </FadeInSection>
+              <span className="w-8 h-px bg-white/40" />
+            </div>
+          </Reveal>
+          <Reveal delay={450} className="mt-12">
+            <Countdown target={data.eventDate} light />
+          </Reveal>
         </div>
 
-        <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 animate-bounce text-white/70">
-          <ChevronDown size={32} strokeWidth={1} />
-        </div>
-      </div>
+        <a
+          href="#velkommen"
+          aria-label="Rul ned"
+          className="absolute bottom-9 left-1/2 -translate-x-1/2 text-white/70 animate-floaty"
+        >
+          <ChevronDown size={30} strokeWidth={1} />
+        </a>
+      </section>
 
-      <div className="max-w-4xl mx-auto px-6 py-20 md:py-32 space-y-32">
-        
-        {/* Tid & Sted */}
-        <FadeInSection>
-          <div className="text-center space-y-6">
-            <MapPin className="mx-auto text-stone-400 mb-4" size={40} strokeWidth={1} />
-            <h2 className="font-serif text-3xl md:text-4xl">Tid & Sted</h2>
-            <div className="w-12 h-[1px] bg-stone-300 mx-auto"></div>
-            <p className="text-stone-600 leading-relaxed max-w-2xl mx-auto text-lg font-light">
+      {/* ---------- INTRO / VELKOMMEN ---------- */}
+      <section id="velkommen" className="max-w-3xl mx-auto px-6 pt-24 md:pt-32 text-center">
+        <Reveal>
+          <p className="text-[0.7rem] uppercase tracking-widest2 text-gold mb-6">Velkommen</p>
+          <p
+            className="font-serif text-2xl md:text-4xl leading-snug text-ink"
+            style={{ letterSpacing: '-0.01em' }}
+          >
+            {data.intro}
+          </p>
+          <Heart className="mx-auto mt-8 text-blush fill-current" size={22} />
+        </Reveal>
+      </section>
+
+      <div className="max-w-4xl mx-auto px-6 py-24 md:py-32 space-y-28 md:space-y-36">
+
+        {/* ---------- TID & STED ---------- */}
+        <section>
+          <Reveal>
+            <SectionHeading icon={MapPin} kicker="Ceremoni & Fest" title="Tid & Sted" />
+            <p className="text-ink-soft leading-relaxed max-w-2xl mx-auto text-lg font-light text-center mt-8">
               {data.timeAndPlace}
             </p>
-          </div>
-        </FadeInSection>
+          </Reveal>
+        </section>
 
-        {/* Program */}
-        <FadeInSection>
-          <div className="bg-white p-8 md:p-12 shadow-sm border border-stone-100 rounded-lg">
-            <div className="text-center space-y-6 mb-12">
-              <Clock className="mx-auto text-stone-400 mb-4" size={40} strokeWidth={1} />
-              <h2 className="font-serif text-3xl md:text-4xl">Program for Dagen</h2>
-            </div>
-            <div className="max-w-md mx-auto relative border-l border-stone-200 pl-6 md:pl-8 space-y-10">
-              {data.program.map((item, index) => (
-                <div key={item.id} className="relative">
-                  <div className="absolute -left-[31px] md:-left-[39px] bg-[#FAFAFA] p-1">
-                    <div className="w-3 h-3 rounded-full bg-stone-300"></div>
-                  </div>
-                  <h3 className="font-serif text-xl mb-1">{item.time}</h3>
-                  <p className="text-stone-500 font-light">{item.event}</p>
+        {/* ---------- PROGRAM ---------- */}
+        <section id="program">
+          <Reveal>
+            <div className="bg-ivory-100 border border-line rounded-3xl shadow-soft p-8 md:p-14">
+              <SectionHeading icon={Clock} kicker="Timeplan" title="Dagens Program" />
+              <div className="max-w-md mx-auto relative mt-12 pl-8">
+                <span className="absolute left-[6px] top-2 bottom-2 w-px bg-gradient-to-b from-gold/30 via-line to-transparent" />
+                <div className="space-y-9">
+                  {data.program.map((item, i) => (
+                    <Reveal key={item.id} delay={i * 90}>
+                      <div className="relative">
+                        <span className="absolute -left-8 top-1.5 w-3.5 h-3.5 rounded-full bg-ivory border-2 border-gold" />
+                        <h3 className="font-serif text-2xl text-ink leading-none">{item.time}</h3>
+                        <p className="text-ink-soft font-light mt-1">{item.event}</p>
+                      </div>
+                    </Reveal>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        </FadeInSection>
+          </Reveal>
+        </section>
 
-        <div className="grid md:grid-cols-2 gap-12 md:gap-20">
-          {/* Overnatning */}
-          <FadeInSection>
-            <div className="text-center md:text-left space-y-6">
-              <Home className="mx-auto md:mx-0 text-stone-400 mb-4" size={32} strokeWidth={1.5} />
-              <h2 className="font-serif text-3xl">Overnatning</h2>
-              <div className="w-12 h-[1px] bg-stone-300 mx-auto md:mx-0"></div>
-              <p className="text-stone-600 leading-relaxed font-light">
-                {data.accommodation}
-              </p>
+        {/* ---------- FIND VEJ / KORT ---------- */}
+        <section id="rejse">
+          <Reveal>
+            <SectionHeading icon={Navigation} kicker="Praktisk" title="Find Vej" />
+          </Reveal>
+          {(() => {
+            // Én lokation (vielse og fest samme sted) → vis ét bredt kort.
+            const sameVenue =
+              `${data.ceremonyName}|${data.ceremonyAddress}`.trim().toLowerCase() ===
+              `${data.venueName}|${data.venueAddress}`.trim().toLowerCase();
+            if (sameVenue) {
+              return (
+                <div className="max-w-xl mx-auto mt-12">
+                  <MapCard
+                    label="Ceremoni & Fest"
+                    name={data.venueName}
+                    address={data.venueAddress}
+                  />
+                </div>
+              );
+            }
+            return (
+              <div className="grid md:grid-cols-2 gap-6 md:gap-8 mt-12">
+                <MapCard delay={0} label="Vielse" name={data.ceremonyName} address={data.ceremonyAddress} />
+                <MapCard delay={120} label="Reception & Fest" name={data.venueName} address={data.venueAddress} />
+              </div>
+            );
+          })()}
+        </section>
+
+        {/* ---------- OVERNATNING + ØNSKELISTE ---------- */}
+        <section className="grid md:grid-cols-2 gap-14 md:gap-20">
+          <Reveal>
+            <div className="text-center md:text-left">
+              <Home className="mx-auto md:mx-0 text-gold mb-5" size={28} strokeWidth={1.4} />
+              <h2 className="font-serif text-3xl text-ink">Overnatning</h2>
+              <div className="rule mt-4 mx-auto md:mx-0" />
+              <p className="text-ink-soft leading-relaxed font-light mt-6">{data.accommodation}</p>
             </div>
-          </FadeInSection>
-
-          {/* Ønskeliste */}
-          <FadeInSection delay={200}>
-            <div className="text-center md:text-left space-y-6">
-              <Gift className="mx-auto md:mx-0 text-stone-400 mb-4" size={32} strokeWidth={1.5} />
-              <h2 className="font-serif text-3xl">Ønskeliste</h2>
-              <div className="w-12 h-[1px] bg-stone-300 mx-auto md:mx-0"></div>
-              <ul className="text-stone-600 font-light space-y-4">
-                {data.wishlist.map(item => (
+          </Reveal>
+          <Reveal delay={150}>
+            <div className="text-center md:text-left">
+              <Gift className="mx-auto md:mx-0 text-gold mb-5" size={28} strokeWidth={1.4} />
+              <h2 className="font-serif text-3xl text-ink">Ønskeliste</h2>
+              <div className="rule mt-4 mx-auto md:mx-0" />
+              <ul className="text-ink-soft font-light space-y-4 mt-6">
+                {data.wishlist.map((item) => (
                   <li key={item.id} className="flex items-start gap-3 justify-center md:justify-start">
-                    <Heart size={16} className="mt-1 flex-shrink-0 text-stone-300 fill-current" />
+                    <Heart size={15} className="mt-1.5 flex-shrink-0 text-blush fill-current" />
                     {item.link ? (
-                      <a href={item.link} target="_blank" rel="noreferrer" className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 transition-colors">
-                        {item.item}
+                      <a
+                        href={item.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group inline-flex items-center gap-1 hover:text-ink transition-colors"
+                      >
+                        <span className="underline decoration-line underline-offset-4 group-hover:decoration-gold">
+                          {item.item}
+                        </span>
+                        <ArrowUpRight size={13} className="text-gold" />
                       </a>
                     ) : (
                       <span>{item.item}</span>
@@ -280,120 +489,200 @@ function LandingPage({ data, user }) {
                 ))}
               </ul>
             </div>
-          </FadeInSection>
-        </div>
+          </Reveal>
+        </section>
 
-        {/* S.U. Formular */}
-        <FadeInSection>
-          <div className="bg-stone-900 text-stone-100 p-8 md:p-16 rounded-xl text-center">
-            <h2 className="font-serif text-3xl md:text-4xl mb-4">S.U.</h2>
-            <p className="font-light text-stone-400 mb-10">
-              Vi håber meget, I vil fejre dagen med os. Senest {data.rsvpDate}.
-            </p>
+        {/* ---------- S.U. ---------- */}
+        <section id="su">
+          <Reveal>
+            <div className="relative overflow-hidden bg-ink text-ivory-100 p-8 md:p-16 rounded-[2rem] shadow-lift">
+              <div className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gold/10 blur-3xl" />
+              <div className="relative text-center">
+                <p className="text-[0.7rem] uppercase tracking-widest2 text-gold-soft mb-4">Svar udbedes</p>
+                <h2 className="font-serif text-4xl md:text-5xl mb-4">S.U.</h2>
+                <p className="font-light text-ivory/70 mb-10 max-w-md mx-auto">
+                  Vi håber meget, I vil fejre dagen med os. Svar venligst senest {data.rsvpDate}.
+                </p>
 
-            {rsvpStatus === 'success' ? (
-              <div className="py-12 flex flex-col items-center justify-center animate-pulse">
-                <CheckCircle2 size={48} className="text-green-400 mb-4" />
-                <p className="text-xl font-serif">Tak for dit svar!</p>
-              </div>
-            ) : (
-              <form onSubmit={handleRsvpSubmit} className="max-w-md mx-auto space-y-6 text-left">
-                <div>
-                  <label className="block text-sm font-light text-stone-400 mb-2">Navn(e)</label>
-                  <input 
-                    required
-                    type="text" 
-                    value={rsvpForm.name}
-                    onChange={e => setRsvpForm({...rsvpForm, name: e.target.value})}
-                    className="w-full bg-stone-800 border border-stone-700 rounded-md p-3 text-white focus:outline-none focus:border-stone-500 transition-colors"
-                    placeholder="Fulde navn på alle gæster"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-light text-stone-400 mb-2">Deltager I?</label>
-                  <select 
-                    value={rsvpForm.attending}
-                    onChange={e => setRsvpForm({...rsvpForm, attending: e.target.value})}
-                    className="w-full bg-stone-800 border border-stone-700 rounded-md p-3 text-white focus:outline-none focus:border-stone-500 appearance-none"
-                  >
-                    <option value="yes">Ja, vi/jeg deltager med glæde</option>
-                    <option value="no">Nej, vi/jeg kan desværre ikke</option>
-                  </select>
-                </div>
-                {rsvpForm.attending === 'yes' && (
-                  <div>
-                    <label className="block text-sm font-light text-stone-400 mb-2">Allergier eller diæter?</label>
-                    <input 
-                      type="text" 
-                      value={rsvpForm.diet}
-                      onChange={e => setRsvpForm({...rsvpForm, diet: e.target.value})}
-                      className="w-full bg-stone-800 border border-stone-700 rounded-md p-3 text-white focus:outline-none focus:border-stone-500 transition-colors"
-                      placeholder="F.eks. vegetar, nøddeallergi (Valgfrit)"
-                    />
+                {rsvpStatus === 'success' ? (
+                  <div className="py-12 flex flex-col items-center justify-center animate-fade-up">
+                    <CheckCircle2 size={48} className="text-sage mb-4" />
+                    <p className="text-2xl font-serif">Tak for dit svar!</p>
+                    <p className="text-ivory/60 font-light mt-2">Vi glæder os til at se jer.</p>
                   </div>
+                ) : (
+                  <form onSubmit={handleRsvpSubmit} className="max-w-md mx-auto space-y-5 text-left">
+                    <Field label="Navn(e)">
+                      <input
+                        required
+                        type="text"
+                        value={rsvpForm.name}
+                        onChange={(e) => setRsvpForm({ ...rsvpForm, name: e.target.value })}
+                        className="dark-input"
+                        placeholder="Fulde navn på alle gæster"
+                      />
+                    </Field>
+                    <Field label="Deltager I?">
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { v: 'yes', t: 'Ja, med glæde' },
+                          { v: 'no', t: 'Desværre ikke' },
+                        ].map((o) => (
+                          <button
+                            key={o.v}
+                            type="button"
+                            onClick={() => setRsvpForm({ ...rsvpForm, attending: o.v })}
+                            className={`btn-press rounded-xl py-3 text-sm font-medium border ${
+                              rsvpForm.attending === o.v
+                                ? 'bg-ivory-100 text-ink border-transparent'
+                                : 'bg-white/5 text-ivory/80 border-white/15 hover:border-white/30'
+                            }`}
+                          >
+                            {o.t}
+                          </button>
+                        ))}
+                      </div>
+                    </Field>
+                    {rsvpForm.attending === 'yes' && (
+                      <Field label="Allergier eller diæt? (valgfrit)">
+                        <input
+                          type="text"
+                          value={rsvpForm.diet}
+                          onChange={(e) => setRsvpForm({ ...rsvpForm, diet: e.target.value })}
+                          className="dark-input"
+                          placeholder="F.eks. vegetar, nøddeallergi"
+                        />
+                      </Field>
+                    )}
+                    <Field label="En lille hilsen (valgfrit)">
+                      <textarea
+                        rows={3}
+                        value={rsvpForm.message}
+                        onChange={(e) => setRsvpForm({ ...rsvpForm, message: e.target.value })}
+                        className="dark-input resize-none"
+                        placeholder="Vi glæder os..."
+                      />
+                    </Field>
+                    <button
+                      disabled={rsvpStatus === 'submitting'}
+                      type="submit"
+                      className="btn-press w-full bg-gold text-white font-medium py-4 rounded-xl hover:bg-gold-deep disabled:opacity-50"
+                    >
+                      {rsvpStatus === 'submitting' ? 'Sender...' : 'Send svar'}
+                    </button>
+                  </form>
                 )}
-                <div>
-                  <label className="block text-sm font-light text-stone-400 mb-2">En lille hilsen (Valgfrit)</label>
-                  <textarea 
-                    rows={3}
-                    value={rsvpForm.message}
-                    onChange={e => setRsvpForm({...rsvpForm, message: e.target.value})}
-                    className="w-full bg-stone-800 border border-stone-700 rounded-md p-3 text-white focus:outline-none focus:border-stone-500 transition-colors resize-none"
-                    placeholder="Vi glæder os..."
-                  />
-                </div>
-                <button 
-                  disabled={rsvpStatus === 'submitting'}
-                  type="submit"
-                  className="w-full bg-white text-stone-900 font-medium py-4 rounded-md hover:bg-stone-200 transition-colors disabled:opacity-50"
-                >
-                  {rsvpStatus === 'submitting' ? 'Sender...' : 'Send Svar'}
-                </button>
-              </form>
-            )}
-          </div>
-        </FadeInSection>
-
+              </div>
+            </div>
+          </Reveal>
+        </section>
       </div>
-      
-      {/* Footer med usynligt link til admin */}
-      <footer className="text-center py-10 text-stone-400 font-light text-sm border-t border-stone-200">
-        <p>Vi glæder os til at se jer!</p>
-        <a href="#/admin" className="opacity-0 hover:opacity-100 transition-opacity absolute bottom-2 right-4 text-xs">Admin</a>
+
+      {/* ---------- FOOTER ---------- */}
+      <footer className="relative text-center py-14 border-t border-line">
+        <p className="font-serif text-3xl text-ink mb-2">{data.names}</p>
+        <p className="text-ink-faint font-light text-sm tracking-wide">
+          Vi glæder os til at se jer · {data.date}
+        </p>
+        <a
+          href="#/admin"
+          className="opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity absolute bottom-3 right-4 text-xs text-ink-faint"
+        >
+          Admin
+        </a>
       </footer>
+
+      {/* Scoped dark-input styling for the RSVP card */}
+      <style>{`
+        .dark-input {
+          width: 100%;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.15);
+          border-radius: 0.75rem;
+          padding: 0.85rem 1rem;
+          color: #FDFBF7;
+          transition: border-color .2s ease, background-color .2s ease;
+        }
+        .dark-input::placeholder { color: rgba(253,251,247,0.4); }
+        .dark-input:focus {
+          outline: none;
+          border-color: #C7A876;
+          background: rgba(255,255,255,0.09);
+        }
+      `}</style>
     </div>
   );
 }
 
-// --- ADMIN PAGE KOMPONENT ---
+// Small labelled field wrapper for the dark RSVP form
+const Field = ({ label, children }) => (
+  <div>
+    <label className="block text-xs font-light text-ivory/60 mb-2 tracking-wide">{label}</label>
+    {children}
+  </div>
+);
+
+// --- MAP CARD (no API key — Google Maps embed) ---
+function MapCard({ label, name, address, delay = 0 }) {
+  const query = encodeURIComponent(`${name}, ${address}`);
+  const embed = `https://www.google.com/maps?q=${query}&z=15&output=embed`;
+  const link = `https://www.google.com/maps/search/?api=1&query=${query}`;
+
+  return (
+    <Reveal delay={delay}>
+      <div className="group bg-ivory-100 border border-line rounded-3xl overflow-hidden shadow-soft hover:shadow-lift transition-shadow duration-500">
+        <div className="relative h-52 bg-line/40">
+          <iframe
+            title={name}
+            src={embed}
+            className="w-full h-full grayscale-[0.15] contrast-[1.02]"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+        <div className="p-6">
+          <p className="text-[0.7rem] uppercase tracking-widest2 text-gold mb-2">{label}</p>
+          <h3 className="font-serif text-2xl text-ink">{name}</h3>
+          <p className="text-ink-soft font-light text-sm mt-1">{address}</p>
+          <a
+            href={link}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-press inline-flex items-center gap-2 mt-5 text-sm font-medium text-ink border border-line rounded-full px-4 py-2 hover:border-gold hover:text-gold-deep"
+          >
+            <Navigation size={14} /> Vis rute
+          </a>
+        </div>
+      </div>
+    </Reveal>
+  );
+}
+
+// --- ADMIN PAGE ---
 function AdminPage({ data, user }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
-  const [activeTab, setActiveTab] = useState('content'); // 'content' | 'rsvps'
+  const [pinError, setPinError] = useState(false);
+  const [activeTab, setActiveTab] = useState('content');
   const [formData, setFormData] = useState(data);
   const [rsvps, setRsvps] = useState([]);
   const [saveStatus, setSaveStatus] = useState('');
 
-  // Hent S.U.'er hvis auth'ed
   useEffect(() => {
     if (!user || !isAuthenticated) return;
-    
     const rsvpsRef = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_rsvps');
-    // Vi henter uden orderBy her for at overholde regel om simple queries, sorterer i memory
     const unsubscribe = onSnapshot(rsvpsRef, (snap) => {
-      const rsvpData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sorter nyeste først
+      const rsvpData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       rsvpData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       setRsvps(rsvpData);
     }, (error) => console.error("Error fetching rsvps", error));
-
     return () => unsubscribe();
   }, [user, isAuthenticated]);
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (pin === '2026') setIsAuthenticated(true); // Simpel PIN validering
-    else alert("Forkert kode");
+    if (pin === '2026') { setIsAuthenticated(true); setPinError(false); }
+    else { setPinError(true); setPin(''); }
   };
 
   const handleSave = async () => {
@@ -402,7 +691,7 @@ function AdminPage({ data, user }) {
     try {
       const infoDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'wedding_info', 'main');
       await updateDoc(infoDocRef, formData);
-      setSaveStatus('Gemt!');
+      setSaveStatus('Gemt ✓');
       setTimeout(() => setSaveStatus(''), 2000);
     } catch (error) {
       console.error("Fejl ved gemning:", error);
@@ -410,207 +699,189 @@ function AdminPage({ data, user }) {
     }
   };
 
+  const set = (patch) => setFormData({ ...formData, ...patch });
+
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-100 p-4">
-        <form onSubmit={handleLogin} className="bg-white p-8 rounded-xl shadow-md max-w-sm w-full text-center">
-          <Lock className="mx-auto text-stone-400 mb-4" size={32} />
-          <h2 className="font-serif text-2xl mb-6">Admin Panel</h2>
-          <input 
-            type="password" 
-            placeholder="Indtast adgangskode"
+      <div className="min-h-screen flex items-center justify-center bg-ivory p-4">
+        <form onSubmit={handleLogin} className="bg-ivory-100 border border-line p-10 rounded-3xl shadow-soft max-w-sm w-full text-center">
+          <div className="w-14 h-14 rounded-full bg-ivory-200 flex items-center justify-center mx-auto mb-5">
+            <Lock className="text-gold" size={24} strokeWidth={1.5} />
+          </div>
+          <h2 className="font-serif text-3xl text-ink mb-1">Admin</h2>
+          <p className="text-ink-faint font-light text-sm mb-6">Anna &amp; Christian</p>
+          <input
+            type="password"
+            placeholder="Adgangskode"
             value={pin}
-            onChange={e => setPin(e.target.value)}
-            className="w-full text-center border border-stone-300 rounded-md p-3 mb-4 focus:outline-none focus:border-stone-500"
+            onChange={(e) => { setPin(e.target.value); setPinError(false); }}
+            className={`w-full text-center bg-white border rounded-xl p-3 mb-3 outline-none transition-colors ${
+              pinError ? 'border-red-300 focus:border-red-400' : 'border-line focus:border-gold'
+            }`}
           />
-          <button type="submit" className="w-full bg-stone-900 text-white rounded-md p-3 hover:bg-stone-800 transition-colors">
+          {pinError && <p className="text-red-400 text-xs mb-3">Forkert adgangskode</p>}
+          <button type="submit" className="btn-press w-full bg-ink text-white rounded-xl p-3 hover:bg-black">
             Log ind
           </button>
-          <a href="#/" className="block mt-4 text-sm text-stone-400 underline">Tilbage til siden</a>
+          <a href="#/" className="block mt-5 text-sm text-ink-faint underline underline-offset-4 hover:text-ink">
+            Tilbage til siden
+          </a>
         </form>
       </div>
     );
   }
 
+  const goingCount = rsvps.filter((r) => r.attending === 'yes').length;
+  const notCount = rsvps.filter((r) => r.attending === 'no').length;
+
   return (
-    <div className="min-h-screen bg-stone-100 p-4 md:p-8">
-      <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col md:flex-row min-h-[80vh]">
-        
+    <div className="min-h-screen bg-ivory p-4 md:p-8">
+      <div className="max-w-5xl mx-auto bg-ivory-100 border border-line rounded-3xl shadow-soft overflow-hidden flex flex-col md:flex-row min-h-[80vh]">
+
         {/* Sidebar */}
-        <div className="w-full md:w-64 bg-stone-50 border-b md:border-b-0 md:border-r border-stone-200 p-6 flex flex-col">
-          <h2 className="font-serif text-2xl mb-8">Oversigt</h2>
+        <div className="w-full md:w-64 bg-ivory-200/60 border-b md:border-b-0 md:border-r border-line p-6 flex flex-col">
+          <h2 className="font-serif text-3xl text-ink mb-1">Oversigt</h2>
+          <p className="text-ink-faint text-xs font-light mb-8 tracking-wide">Bryllupsadministration</p>
           <nav className="space-y-2 flex-grow">
-            <button 
-              onClick={() => setActiveTab('content')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${activeTab === 'content' ? 'bg-stone-200 font-medium' : 'hover:bg-stone-100 text-stone-600'}`}
-            >
-              <Edit3 size={18} /> Rediger Indhold
-            </button>
-            <button 
-              onClick={() => setActiveTab('rsvps')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${activeTab === 'rsvps' ? 'bg-stone-200 font-medium' : 'hover:bg-stone-100 text-stone-600'}`}
-            >
-              <Users size={18} /> S.U. Besvarelser
-              <span className="ml-auto bg-stone-900 text-white text-xs py-1 px-2 rounded-full">{rsvps.length}</span>
-            </button>
+            <TabButton active={activeTab === 'content'} onClick={() => setActiveTab('content')} icon={Edit3}>
+              Rediger indhold
+            </TabButton>
+            <TabButton active={activeTab === 'rsvps'} onClick={() => setActiveTab('rsvps')} icon={Users} badge={rsvps.length}>
+              S.U. besvarelser
+            </TabButton>
           </nav>
-          <a href="#/" className="mt-8 text-sm text-stone-500 hover:text-stone-900 flex items-center gap-2">
+          <a href="#/" className="mt-8 text-sm text-ink-soft hover:text-ink flex items-center gap-2 transition-colors">
             &larr; Tilbage til hjemmeside
           </a>
         </div>
 
-        {/* Main Content Area */}
+        {/* Main */}
         <div className="flex-1 p-6 md:p-10 overflow-y-auto">
           {activeTab === 'content' && (
-            <div className="space-y-8 max-w-2xl">
-              <div className="flex justify-between items-center border-b border-stone-200 pb-4">
-                <h1 className="text-3xl font-serif">Rediger Hjemmeside</h1>
-                <button onClick={handleSave} className="bg-stone-900 text-white px-6 py-2 rounded-md hover:bg-stone-800 transition-colors font-medium">
+            <div className="space-y-9 max-w-2xl">
+              <div className="flex justify-between items-center border-b border-line pb-5">
+                <h1 className="text-3xl font-serif text-ink">Rediger hjemmeside</h1>
+                <button onClick={handleSave} className="btn-press bg-gold text-white px-6 py-2.5 rounded-xl hover:bg-gold-deep font-medium">
                   {saveStatus || 'Gem ændringer'}
                 </button>
               </div>
 
-              {/* Generelle Informationer */}
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg text-stone-900">Generelt</h3>
+              <AdminGroup title="Generelt">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-stone-500 uppercase tracking-wider mb-1">Navne</label>
-                    <input className="w-full border border-stone-300 rounded p-2 focus:border-stone-500 outline-none" value={formData.names} onChange={e => setFormData({...formData, names: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-stone-500 uppercase tracking-wider mb-1">Dato</label>
-                    <input className="w-full border border-stone-300 rounded p-2 focus:border-stone-500 outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                  </div>
+                  <AInput label="Navne" value={formData.names} onChange={(v) => set({ names: v })} />
+                  <AInput label="Dato (visning)" value={formData.date} onChange={(v) => set({ date: v })} />
                 </div>
-                <div>
-                  <label className="block text-xs text-stone-500 uppercase tracking-wider mb-1">S.U. Frist</label>
-                  <input className="w-full border border-stone-300 rounded p-2 focus:border-stone-500 outline-none" value={formData.rsvpDate} onChange={e => setFormData({...formData, rsvpDate: e.target.value})} />
+                <div className="grid grid-cols-2 gap-4">
+                  <AInput label="Dato & tid til nedtælling" type="datetime-local"
+                    value={toLocalInput(formData.eventDate)}
+                    onChange={(v) => set({ eventDate: v })} />
+                  <AInput label="S.U. frist" value={formData.rsvpDate} onChange={(v) => set({ rsvpDate: v })} />
                 </div>
-                <div>
-                  <label className="block text-xs text-stone-500 uppercase tracking-wider mb-1">Hero Billede URL (Unsplash e.lign.)</label>
-                  <input className="w-full border border-stone-300 rounded p-2 focus:border-stone-500 outline-none" value={formData.heroImage} onChange={e => setFormData({...formData, heroImage: e.target.value})} />
-                </div>
-              </div>
+                <AInput label="Hero billede URL" value={formData.heroImage} onChange={(v) => set({ heroImage: v })} />
+              </AdminGroup>
 
-              {/* Tekster */}
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg text-stone-900 border-t border-stone-100 pt-6">Tekst Sektioner</h3>
-                <div>
-                  <label className="block text-xs text-stone-500 uppercase tracking-wider mb-1">Tid & Sted</label>
-                  <textarea rows={3} className="w-full border border-stone-300 rounded p-2 focus:border-stone-500 outline-none resize-none" value={formData.timeAndPlace} onChange={e => setFormData({...formData, timeAndPlace: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-xs text-stone-500 uppercase tracking-wider mb-1">Overnatning</label>
-                  <textarea rows={3} className="w-full border border-stone-300 rounded p-2 focus:border-stone-500 outline-none resize-none" value={formData.accommodation} onChange={e => setFormData({...formData, accommodation: e.target.value})} />
-                </div>
-              </div>
+              <AdminGroup title="Tekster">
+                <AArea label="Velkomst / intro" value={formData.intro} onChange={(v) => set({ intro: v })} />
+                <AArea label="Tid & Sted" value={formData.timeAndPlace} onChange={(v) => set({ timeAndPlace: v })} />
+                <AArea label="Overnatning" value={formData.accommodation} onChange={(v) => set({ accommodation: v })} />
+              </AdminGroup>
 
-              {/* Program Editor */}
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg text-stone-900 border-t border-stone-100 pt-6">Program</h3>
+              <AdminGroup title="Find vej (kort)">
+                <div className="grid grid-cols-2 gap-4">
+                  <AInput label="Vielse — sted" value={formData.ceremonyName} onChange={(v) => set({ ceremonyName: v })} />
+                  <AInput label="Vielse — adresse" value={formData.ceremonyAddress} onChange={(v) => set({ ceremonyAddress: v })} />
+                  <AInput label="Fest — sted" value={formData.venueName} onChange={(v) => set({ venueName: v })} />
+                  <AInput label="Fest — adresse" value={formData.venueAddress} onChange={(v) => set({ venueAddress: v })} />
+                </div>
+              </AdminGroup>
+
+              <AdminGroup title="Program">
                 {formData.program.map((item, index) => (
-                  <div key={item.id} className="flex gap-2 items-center bg-stone-50 p-2 rounded border border-stone-200">
-                    <input className="w-24 border border-stone-300 rounded p-2 text-sm" placeholder="13:00" value={item.time} onChange={e => {
-                      const newProgram = [...formData.program];
-                      newProgram[index].time = e.target.value;
-                      setFormData({...formData, program: newProgram});
-                    }}/>
-                    <input className="flex-1 border border-stone-300 rounded p-2 text-sm" placeholder="Begivenhed" value={item.event} onChange={e => {
-                      const newProgram = [...formData.program];
-                      newProgram[index].event = e.target.value;
-                      setFormData({...formData, program: newProgram});
-                    }}/>
-                    <button onClick={() => {
-                      setFormData({...formData, program: formData.program.filter((_, i) => i !== index)});
-                    }} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
+                  <div key={item.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-line">
+                    <input className="w-24 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="13:00"
+                      value={item.time}
+                      onChange={(e) => {
+                        const p = [...formData.program]; p[index] = { ...p[index], time: e.target.value }; set({ program: p });
+                      }} />
+                    <input className="flex-1 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="Begivenhed"
+                      value={item.event}
+                      onChange={(e) => {
+                        const p = [...formData.program]; p[index] = { ...p[index], event: e.target.value }; set({ program: p });
+                      }} />
+                    <button onClick={() => set({ program: formData.program.filter((_, i) => i !== index) })}
+                      className="p-2 text-ink-faint hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 ))}
-                <button onClick={() => {
-                  setFormData({...formData, program: [...formData.program, {id: Date.now(), time: "", event: ""}]});
-                }} className="text-sm font-medium text-stone-600 flex items-center gap-1 hover:text-stone-900">
-                  <Plus size={16} /> Tilføj punkt
-                </button>
-              </div>
+                <AddButton onClick={() => set({ program: [...formData.program, { id: Date.now(), time: "", event: "" }] })}>
+                  Tilføj punkt
+                </AddButton>
+              </AdminGroup>
 
-              {/* Ønskeliste Editor */}
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg text-stone-900 border-t border-stone-100 pt-6">Ønskeliste</h3>
+              <AdminGroup title="Ønskeliste">
                 {formData.wishlist.map((item, index) => (
-                  <div key={item.id} className="flex gap-2 items-center bg-stone-50 p-2 rounded border border-stone-200">
-                    <input className="flex-1 border border-stone-300 rounded p-2 text-sm" placeholder="Ønske" value={item.item} onChange={e => {
-                      const newWishlist = [...formData.wishlist];
-                      newWishlist[index].item = e.target.value;
-                      setFormData({...formData, wishlist: newWishlist});
-                    }}/>
-                    <input className="flex-1 border border-stone-300 rounded p-2 text-sm" placeholder="Link (Valgfrit, inkl. https://)" value={item.link} onChange={e => {
-                      const newWishlist = [...formData.wishlist];
-                      newWishlist[index].link = e.target.value;
-                      setFormData({...formData, wishlist: newWishlist});
-                    }}/>
-                    <button onClick={() => {
-                      setFormData({...formData, wishlist: formData.wishlist.filter((_, i) => i !== index)});
-                    }} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
+                  <div key={item.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-line">
+                    <input className="flex-1 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="Ønske"
+                      value={item.item}
+                      onChange={(e) => {
+                        const w = [...formData.wishlist]; w[index] = { ...w[index], item: e.target.value }; set({ wishlist: w });
+                      }} />
+                    <input className="flex-1 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="Link (valgfrit)"
+                      value={item.link}
+                      onChange={(e) => {
+                        const w = [...formData.wishlist]; w[index] = { ...w[index], link: e.target.value }; set({ wishlist: w });
+                      }} />
+                    <button onClick={() => set({ wishlist: formData.wishlist.filter((_, i) => i !== index) })}
+                      className="p-2 text-ink-faint hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 ))}
-                <button onClick={() => {
-                  setFormData({...formData, wishlist: [...formData.wishlist, {id: Date.now(), item: "", link: ""}]});
-                }} className="text-sm font-medium text-stone-600 flex items-center gap-1 hover:text-stone-900">
-                  <Plus size={16} /> Tilføj ønske
-                </button>
-              </div>
-
+                <AddButton onClick={() => set({ wishlist: [...formData.wishlist, { id: Date.now(), item: "", link: "" }] })}>
+                  Tilføj ønske
+                </AddButton>
+              </AdminGroup>
             </div>
           )}
 
           {activeTab === 'rsvps' && (
             <div className="space-y-6">
-              <h1 className="text-3xl font-serif border-b border-stone-200 pb-4">S.U. Besvarelser</h1>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div className="bg-green-50 text-green-800 p-4 rounded-lg">
-                  <p className="text-sm font-medium">Deltager</p>
-                  <p className="text-3xl font-serif mt-1">{rsvps.filter(r => r.attending === 'yes').length}</p>
-                </div>
-                <div className="bg-red-50 text-red-800 p-4 rounded-lg">
-                  <p className="text-sm font-medium">Deltager ikke</p>
-                  <p className="text-3xl font-serif mt-1">{rsvps.filter(r => r.attending === 'no').length}</p>
-                </div>
-                <div className="bg-stone-100 text-stone-800 p-4 rounded-lg">
-                  <p className="text-sm font-medium">Total Besvarelser</p>
-                  <p className="text-3xl font-serif mt-1">{rsvps.length}</p>
-                </div>
+              <h1 className="text-3xl font-serif text-ink border-b border-line pb-5">S.U. besvarelser</h1>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatCard tone="sage" label="Deltager" value={goingCount} />
+                <StatCard tone="blush" label="Deltager ikke" value={notCount} />
+                <StatCard tone="ink" label="Besvarelser i alt" value={rsvps.length} />
               </div>
 
-              <div className="bg-white border border-stone-200 rounded-lg overflow-hidden">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-stone-50 border-b border-stone-200">
-                    <tr>
-                      <th className="p-4 font-medium text-stone-600">Navn</th>
-                      <th className="p-4 font-medium text-stone-600">Status</th>
-                      <th className="p-4 font-medium text-stone-600">Allergi/Diæt</th>
-                      <th className="p-4 font-medium text-stone-600">Hilsen</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {rsvps.length === 0 ? (
+              <div className="bg-white border border-line rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm min-w-[560px]">
+                    <thead className="bg-ivory-200/60 border-b border-line">
                       <tr>
-                        <td colSpan="4" className="p-8 text-center text-stone-500 font-light">Ingen besvarelser endnu.</td>
+                        {['Navn', 'Status', 'Allergi / diæt', 'Hilsen'].map((h) => (
+                          <th key={h} className="p-4 font-medium text-ink-soft">{h}</th>
+                        ))}
                       </tr>
-                    ) : rsvps.map((rsvp) => (
-                      <tr key={rsvp.id} className="hover:bg-stone-50">
-                        <td className="p-4 font-medium">{rsvp.name}</td>
-                        <td className="p-4">
-                          {rsvp.attending === 'yes' 
-                            ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">Deltager</span> 
-                            : <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">Afbud</span>}
-                        </td>
-                        <td className="p-4 text-stone-600">{rsvp.diet || '-'}</td>
-                        <td className="p-4 text-stone-600 max-w-xs truncate" title={rsvp.message}>{rsvp.message || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {rsvps.length === 0 ? (
+                        <tr><td colSpan="4" className="p-10 text-center text-ink-faint font-light">Ingen besvarelser endnu.</td></tr>
+                      ) : rsvps.map((rsvp) => (
+                        <tr key={rsvp.id} className="hover:bg-ivory-200/40 transition-colors">
+                          <td className="p-4 font-medium text-ink">{rsvp.name}</td>
+                          <td className="p-4">
+                            {rsvp.attending === 'yes'
+                              ? <span className="bg-sage/15 text-sage px-2.5 py-1 rounded-full text-xs font-medium">Deltager</span>
+                              : <span className="bg-red-100 text-red-600 px-2.5 py-1 rounded-full text-xs font-medium">Afbud</span>}
+                          </td>
+                          <td className="p-4 text-ink-soft">{rsvp.diet || '—'}</td>
+                          <td className="p-4 text-ink-soft max-w-xs truncate" title={rsvp.message}>{rsvp.message || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -618,4 +889,81 @@ function AdminPage({ data, user }) {
       </div>
     </div>
   );
+}
+
+// --- ADMIN SUB-COMPONENTS ---
+const TabButton = ({ active, onClick, icon: Icon, badge, children }) => (
+  <button
+    onClick={onClick}
+    className={`btn-press w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left ${
+      active ? 'bg-ink text-white' : 'hover:bg-ivory-200 text-ink-soft'
+    }`}
+  >
+    {Icon && <Icon size={18} />} {children}
+    {badge !== undefined && (
+      <span className={`ml-auto text-xs py-0.5 px-2 rounded-full ${active ? 'bg-white/20' : 'bg-ink text-white'}`}>
+        {badge}
+      </span>
+    )}
+  </button>
+);
+
+const AdminGroup = ({ title, children }) => (
+  <div className="space-y-4">
+    <h3 className="font-serif text-xl text-ink border-t border-line pt-6 first:border-t-0 first:pt-0">{title}</h3>
+    {children}
+  </div>
+);
+
+const AInput = ({ label, value, onChange, type = 'text' }) => (
+  <div>
+    <label className="block text-xs text-ink-faint uppercase tracking-wider mb-1.5">{label}</label>
+    <input
+      type={type}
+      className="w-full bg-white border border-line rounded-lg p-2.5 outline-none focus:border-gold transition-colors"
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  </div>
+);
+
+const AArea = ({ label, value, onChange }) => (
+  <div>
+    <label className="block text-xs text-ink-faint uppercase tracking-wider mb-1.5">{label}</label>
+    <textarea
+      rows={3}
+      className="w-full bg-white border border-line rounded-lg p-2.5 outline-none focus:border-gold transition-colors resize-none"
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  </div>
+);
+
+const AddButton = ({ onClick, children }) => (
+  <button onClick={onClick} className="text-sm font-medium text-gold-deep flex items-center gap-1.5 hover:text-gold transition-colors">
+    <Plus size={16} /> {children}
+  </button>
+);
+
+const StatCard = ({ tone, label, value }) => {
+  const tones = {
+    sage: 'bg-sage/12 text-sage',
+    blush: 'bg-blush/40 text-ink',
+    ink: 'bg-ink text-ivory-100',
+  };
+  return (
+    <div className={`${tones[tone]} p-5 rounded-2xl`}>
+      <p className="text-sm font-medium opacity-80">{label}</p>
+      <p className="text-4xl font-serif mt-1">{value}</p>
+    </div>
+  );
+};
+
+// datetime-local expects "YYYY-MM-DDTHH:mm"
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return typeof iso === 'string' ? iso.slice(0, 16) : '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

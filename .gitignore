@@ -15,6 +15,10 @@ dist-ssr
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+.claude/
+# Firebase local artifacts
+.firebase/
+firebase-debug.log*
 .idea
 .DS_Store
 *.suo
