@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Heart, MapPin, Clock, Gift, Home, CheckCircle2, Lock, Users, Edit3, Plus,
-  Trash2, ChevronDown, Navigation, ArrowUpRight, HelpCircle, Car, X, UserPlus,
+  Trash2, ChevronDown, Navigation, ArrowUpRight, HelpCircle, X, UserPlus,
   CalendarPlus, Download, ExternalLink
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
@@ -512,16 +512,13 @@ function LandingPage({ data, user }) {
           </Reveal>
         </section>
 
-        {/* ---------- PRAKTISK: FAQ + SAMKØRSEL ---------- */}
+        {/* ---------- PRAKTISK / FAQ ---------- */}
         <section id="praktisk">
           <Reveal>
             <SectionHeading icon={HelpCircle} kicker="Godt at vide" title="Praktisk & FAQ" />
           </Reveal>
           <div className="mt-12">
             <FAQSection items={data.faq} />
-          </div>
-          <div className="mt-16">
-            <Carpool user={user} />
           </div>
         </section>
 
@@ -802,135 +799,6 @@ function FAQSection({ items = [] }) {
         );
       })}
     </div>
-  );
-}
-
-// --- SAMKØRSEL (CARPOOL BOARD) ---
-const carpoolInput =
-  "w-full bg-white border border-line rounded-xl p-2.5 text-sm outline-none focus:border-gold transition-colors";
-
-const CarpoolList = ({ title, rows, emptyText }) => (
-  <div>
-    <p className="text-[0.7rem] uppercase tracking-widest2 text-gold mb-3">{title}</p>
-    {rows.length === 0 ? (
-      <p className="text-ink-faint font-light text-sm">{emptyText}</p>
-    ) : (
-      <ul className="space-y-3">
-        {rows.map((p) => (
-          <li key={p.id} className="bg-white border border-line rounded-xl p-3.5">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="font-medium text-ink">{p.name}</span>
-              {p.seats && <span className="text-xs text-sage font-medium">{p.seats} pladser</span>}
-            </div>
-            <p className="text-ink-soft font-light text-sm mt-0.5">{p.area}</p>
-            {p.contact && <p className="text-ink-faint text-xs mt-1">{p.contact}</p>}
-          </li>
-        ))}
-      </ul>
-    )}
-  </div>
-);
-
-function Carpool({ user }) {
-  const [posts, setPosts] = useState([]);
-  const [form, setForm] = useState({ name: '', direction: 'offer', area: '', seats: '', contact: '' });
-  const [status, setStatus] = useState('idle');
-
-  useEffect(() => {
-    if (!user) return;
-    const ref = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_carpool');
-    const unsub = onSnapshot(ref, (snap) => {
-      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      rows.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      setPosts(rows);
-    }, (e) => console.error("Fejl ved hentning af samkørsel:", e));
-    return () => unsub();
-  }, [user]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!user || !form.name.trim() || !form.area.trim()) return;
-    setStatus('submitting');
-    try {
-      const ref = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_carpool');
-      await addDoc(ref, {
-        name: form.name.trim(),
-        direction: form.direction,
-        area: form.area.trim(),
-        seats: form.direction === 'offer' ? form.seats.trim() : '',
-        contact: form.contact.trim(),
-        timestamp: new Date().toISOString(),
-      });
-      setForm({ name: '', direction: 'offer', area: '', seats: '', contact: '' });
-      setStatus('idle');
-    } catch (err) {
-      console.error("Fejl ved opslag:", err);
-      setStatus('idle');
-    }
-  };
-
-  const offers = posts.filter((p) => p.direction === 'offer');
-  const needs = posts.filter((p) => p.direction === 'need');
-
-  return (
-    <Reveal>
-      <div className="bg-ivory-100 border border-line rounded-3xl shadow-soft p-8 md:p-12">
-        <div className="text-center mb-8">
-          <Car className="mx-auto text-gold mb-4" size={28} strokeWidth={1.4} />
-          <h3 className="font-serif text-3xl text-ink">Samkørsel</h3>
-          <div className="rule mt-4 mx-auto" />
-          <p className="text-ink-soft font-light mt-5 max-w-lg mx-auto">
-            Sans & Samling ligger lidt afsides — hjælp hinanden frem og hjem. Tilbyd en plads i bilen, eller søg et lift.
-          </p>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-8 mb-10">
-          <CarpoolList title="Tilbyder plads" rows={offers} emptyText="Ingen tilbud endnu — vær den første." />
-          <CarpoolList title="Søger plads" rows={needs} emptyText="Ingen søger lige nu." />
-        </div>
-
-        <form onSubmit={submit} className="border-t border-line pt-8 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { v: 'offer', t: 'Jeg tilbyder plads' },
-              { v: 'need', t: 'Jeg søger plads' },
-            ].map((o) => (
-              <button
-                key={o.v}
-                type="button"
-                onClick={() => setForm({ ...form, direction: o.v })}
-                className={`btn-press rounded-xl py-2.5 text-sm font-medium border ${
-                  form.direction === o.v
-                    ? 'bg-ink text-white border-transparent'
-                    : 'bg-white text-ink-soft border-line hover:border-gold'
-                }`}
-              >
-                {o.t}
-              </button>
-            ))}
-          </div>
-          <div className="grid sm:grid-cols-2 gap-2">
-            <input className={carpoolInput} required placeholder="Dit navn"
-              value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <input className={carpoolInput} required placeholder="Til/fra hvor? (fx fra Aarhus)"
-              value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
-            {form.direction === 'offer' && (
-              <input className={carpoolInput} placeholder="Antal ledige pladser"
-                value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} />
-            )}
-            <input className={carpoolInput} placeholder="Kontakt (tlf./mail) — valgfrit"
-              value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
-          </div>
-          <button
-            type="submit"
-            disabled={status === 'submitting'}
-            className="btn-press w-full sm:w-auto bg-gold text-white font-medium px-6 py-2.5 rounded-xl hover:bg-gold-deep disabled:opacity-50"
-          >
-            {status === 'submitting' ? 'Slår op...' : 'Slå op'}
-          </button>
-        </form>
-      </div>
-    </Reveal>
   );
 }
 

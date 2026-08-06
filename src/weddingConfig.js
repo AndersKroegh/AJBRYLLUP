@@ -41,7 +41,7 @@ export const DEFAULT_DATA = {
   ],
   faq: [
     { id: 1, q: "Hvad er dresscode?", a: "Vi ønsker os en festlig og elegant dag — tænk gerne jakkesæt og kjole. Undgå venligst helt hvidt af hensyn til bruden." },
-    { id: 2, q: "Hvordan kommer jeg til Sans & Samling?", a: "Adressen er Ikastvej 7, 7361 Ejstrupholm. Der er gode parkeringsmuligheder på stedet — men overvej at køre sammen med andre gæster (se samkørsel nedenfor)." },
+    { id: 2, q: "Hvordan kommer jeg til Sans & Samling?", a: "Adressen er Ikastvej 7, 7361 Ejstrupholm. Der er gode parkeringsmuligheder på stedet — og overvej gerne at køre sammen med andre gæster." },
     { id: 3, q: "Er børn med til festen?", a: "Vi holder festen som en voksenfest. Sig endelig til, hvis I har brug for hjælp til at finde børnepasning i nærheden." },
     { id: 4, q: "Hvad med gaver?", a: "Jeres nærvær er den største gave. Har I alligevel lyst til at give noget, finder I et par idéer under Ønskeliste." },
     { id: 5, q: "Kan man overnatte?", a: "Ja — Sans & Samling har overnatning på selve stedet. Giv os besked, hvis I ønsker at blive natten over, så hjælper vi med det praktiske." }
