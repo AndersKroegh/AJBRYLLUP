@@ -3,19 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#FBF8F3" />
     <meta name="description" content="Anders & Julie skal giftes den 10. juli 2027 på Sans & Samling i Ejstrupholm. Se program, find vej og send din S.U." />
 
-    <!-- Fonts: Cormorant Garamond (elegant serif display) + Inter (clean UI/body) -->
+    <!-- Fonts: Cormorant Garamond (elegant serif display) + Pinyon Script (kuvert-intro) + Inter (clean UI/body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Pinyon+Script&family=Inter:wght@300;400;500;600&display=swap"
       rel="stylesheet"
     />
 
     <title>Anders & Julie · 10. juli 2027</title>
+
+    <!-- Forhåndsvisning når linket deles (Messenger, SMS, mail, Slack m.fl.).
+         VITE_SITE_URL sættes i .env, så billedet får en fuld adresse – det kræver Facebook/Messenger. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="da_DK" />
+    <meta property="og:site_name" content="Anders & Julie" />
+    <meta property="og:title" content="Anders & Julie · 10. juli 2027" />
+    <meta property="og:description" content="Vi skal giftes! Se program, find vej og send jeres S.U. – Sans & Samling, Ejstrupholm." />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:image" content="%VITE_SITE_URL%/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Vokssegl med A&J – Anders & Julie skal giftes 10. juli 2027 på Sans & Samling, Ejstrupholm" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Anders & Julie · 10. juli 2027" />
+    <meta name="twitter:description" content="Vi skal giftes! Se program, find vej og send jeres S.U." />
+    <meta name="twitter:image" content="%VITE_SITE_URL%/og-image.jpg" />
   </head>
   <body>
     <div id="root"></div>
