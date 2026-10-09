@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Heart, MapPin, Clock, Gift, Home, CheckCircle2, Lock, Users, Edit3, Plus,
   Trash2, ChevronDown, Navigation, ArrowUpRight, HelpCircle, X, UserPlus,
-  CalendarPlus, Download, ExternalLink
+  CalendarPlus, Download, ExternalLink, Menu
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -241,6 +241,7 @@ export default function App() {
 // --- TRANSLUCENT NAV ---
 function Nav({ names }) {
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     onScroll();
@@ -249,28 +250,33 @@ function Nav({ names }) {
   }, []);
 
   const initials = names.split('&').map(s => s.trim()[0]).filter(Boolean).join(' & ');
+  // Menuen har altid lys baggrund, når den er åben → mørk tekst i toppen.
+  const darkText = scrolled || menuOpen;
 
   return (
     <header
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ease-spring ${
-        scrolled ? 'glass shadow-glass py-3' : 'py-5'
+        darkText ? 'glass shadow-glass py-3' : 'py-5'
       }`}
     >
       <nav className="max-w-6xl mx-auto px-6 flex items-center justify-between">
         <a
           href="#hjem"
-          className={`font-serif text-xl tracking-wide transition-colors ${
-            scrolled ? 'text-ink' : 'text-white text-shadow-soft'
+          onClick={() => setMenuOpen(false)}
+          className={`font-serif text-xl tracking-wide whitespace-nowrap transition-colors ${
+            darkText ? 'text-ink' : 'text-white text-shadow-soft'
           }`}
         >
           {initials}
         </a>
-        <ul className="flex items-center gap-6 sm:gap-8">
+
+        {/* Desktop-menu */}
+        <ul className="hidden md:flex items-center gap-6 sm:gap-8">
           {NAV_LINKS.map((l) => (
             <li key={l.id}>
               <a
                 href={`#${l.id}`}
-                className={`text-sm font-light tracking-wide transition-colors hover:text-gold ${
+                className={`text-sm font-light tracking-wide whitespace-nowrap transition-colors hover:text-gold ${
                   scrolled ? 'text-ink-soft' : 'text-white/90 text-shadow-soft'
                 }`}
               >
@@ -279,7 +285,39 @@ function Nav({ names }) {
             </li>
           ))}
         </ul>
+
+        {/* Mobil: hamburger */}
+        <button
+          type="button"
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-label={menuOpen ? 'Luk menu' : 'Åbn menu'}
+          aria-expanded={menuOpen}
+          className={`md:hidden btn-press -mr-1 p-2 transition-colors ${darkText ? 'text-ink' : 'text-white text-shadow-soft'}`}
+        >
+          {menuOpen ? <X size={24} strokeWidth={1.5} /> : <Menu size={24} strokeWidth={1.5} />}
+        </button>
       </nav>
+
+      {/* Mobil dropdown-menu */}
+      <div
+        className={`md:hidden overflow-hidden transition-[max-height,opacity] duration-500 ease-spring ${
+          menuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <ul className="px-6 pt-3 pb-5 flex flex-col">
+          {NAV_LINKS.map((l) => (
+            <li key={l.id} className="border-b border-line/70 last:border-b-0">
+              <a
+                href={`#${l.id}`}
+                onClick={() => setMenuOpen(false)}
+                className="block py-3.5 font-serif text-xl text-ink hover:text-gold transition-colors"
+              >
+                {l.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
     </header>
   );
 }
