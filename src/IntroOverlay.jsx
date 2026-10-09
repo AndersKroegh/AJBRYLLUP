@@ -1,101 +1,142 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import waxSeal from './assets/wax-seal.png';
 
-// Intro-overlay der spiller én gang, når siden åbnes:
-// en håndtegnet alpe-linjetegning (nik til Val Thorens) tegner sig selv,
-// mens navne, undertekst og dato toner frem — hvorefter overlayet opløses
-// og afslører siden. Respekterer prefers-reduced-motion.
-export default function IntroOverlay({ names, subtitle, date, onDone }) {
-  const [leaving, setLeaving] = useState(false);
-  const rootRef = useRef(null);
-  const doneRef = useRef(false);
+// Åbnings-overlay: gæsten mødes af en lukket kuvert med vores vokssegl.
+// Et tryk bryder seglet, flappen folder op, invitationskortet glider op,
+// og overlayet opløses og afslører siden. Respekterer prefers-reduced-motion.
 
-  const finish = () => {
-    if (doneRef.current) return;
-    doneRef.current = true;
-    onDone?.();
-  };
+// Kuvertens koordinatsystem (SVG viewBox). Proportion 3:2.
+const W = 300;
+const H = 200;
+const TIP = 124; // hvor langt flappens spids når ned
 
-  useEffect(() => {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const holdMs = reduce ? 1100 : 3600;
-    const t = setTimeout(() => setLeaving(true), holdMs);
-    // Sikkerhedsnet: hvis transitionend ikke fyrer, luk alligevel.
-    const guard = setTimeout(finish, holdMs + 1400);
-    return () => { clearTimeout(t); clearTimeout(guard); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const onTransitionEnd = (e) => {
-    if (e.target === rootRef.current && e.propertyName === 'opacity' && leaving) finish();
-  };
-
-  return (
-    <div
-      ref={rootRef}
-      className={`intro-overlay ${leaving ? 'intro-leaving' : ''}`}
-      onTransitionEnd={onTransitionEnd}
-      role="dialog"
-      aria-label="Velkommen"
-    >
-      <button type="button" className="intro-skip" onClick={() => setLeaving(true)}>
-        Spring over
-      </button>
-
-      <div className="intro-inner">
-        <MountainArt />
-
-        <div className="intro-text">
-          <p className="intro-kicker">Val Thorens · hvor det hele begyndte</p>
-          <h1 className="intro-names">{names}</h1>
-          <div className="intro-date">
-            <span className="intro-line" />
-            {date}
-            <span className="intro-line" />
-          </div>
-          {subtitle && <p className="intro-sub">{subtitle}</p>}
-        </div>
-      </div>
-    </div>
-  );
+// Bølget ("scalloped") kant fra punkt a til b, bygget af n buer der buer udad.
+function scallops([x1, y1], [x2, y2], n) {
+  const len = Math.hypot(x2 - x1, y2 - y1) / n;
+  const r = (len * 0.7).toFixed(2);
+  let d = '';
+  for (let i = 1; i <= n; i++) {
+    const x = (x1 + ((x2 - x1) * i) / n).toFixed(2);
+    const y = (y1 + ((y2 - y1) * i) / n).toFixed(2);
+    d += ` A${r} ${r} 0 0 0 ${x} ${y}`;
+  }
+  return d;
 }
 
-// Håndtegnet, selv-tegnende alpe-skyline. pathLength="1" normaliserer alle
-// stier, så stroke-dashoffset-animationen kan tegne dem ensartet.
-function MountainArt() {
+const FLAP_PATH =
+  `M0 0${scallops([0, 0], [134, TIP - 10], 3)}` +
+  ` Q150 ${TIP + 8} 166 ${TIP - 10}` +
+  `${scallops([166, TIP - 10], [W, 0], 3)} Z`;
+
+// Forlommen dækker alt undtagen V'et øverst, så kortet ser ud til at ligge i kuverten.
+const POCKET_PATH = `M0 0 L150 ${TIP - 6} L${W} 0 V${H} H0 Z`;
+
+// Tidslinje (ms efter tryk)
+const STEPS = [
+  { stage: 1, at: 0 },     // seglet brydes
+  { stage: 2, at: 260 },   // flappen folder op
+  { stage: 3, at: 640 },   // flappen lægger sig bag kortet
+  { stage: 4, at: 1000 },  // kortet glider op
+  { stage: 5, at: 2700 },  // overlayet toner ud
+];
+const DONE_AT = 3600;
+
+export default function IntroOverlay({ names, date, onDone }) {
+  const [stage, setStage] = useState(0);
+  const timers = useRef([]);
+
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  const open = () => {
+    if (stage > 0) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const steps = reduce ? [{ stage: 5, at: 0 }] : STEPS;
+    timers.current = steps.map((s) => setTimeout(() => setStage(s.stage), s.at));
+    timers.current.push(setTimeout(() => onDone?.(), reduce ? 700 : DONE_AT));
+  };
+
+  const [first, second] = names.split('&').map((s) => s.trim());
+  const cls = [
+    'env-overlay',
+    stage >= 1 && 'is-cracked',
+    stage >= 2 && 'is-open',
+    stage >= 3 && 'is-flipped',
+    stage >= 4 && 'is-risen',
+    stage >= 5 && 'is-leaving',
+  ].filter(Boolean).join(' ');
+
   return (
-    <svg className="intro-mtn" viewBox="0 0 1600 520" fill="none" aria-hidden="true">
-      {/* fjern sol/måne højt oppe */}
-      <circle className="draw d0" cx="1300" cy="90" r="34" pathLength="1" />
+    <div className={cls} role="dialog" aria-modal="true" aria-label="Invitation">
+      <div className="env-scene">
+        <header className="env-head">
+          <p className="env-kicker">Et kærlighedsbrev fra</p>
+          <h1 className="env-names">
+            {first}
+            {second && <><span className="env-amp"> &amp; </span>{second}</>}
+          </h1>
+        </header>
 
-      {/* fjerne bagerste tinder */}
-      <path className="draw d1" pathLength="1"
-        d="M0 300 L150 262 L250 286 L340 232 L430 270 L520 214 L610 260 L700 226 L800 262" />
-      <path className="draw d1" pathLength="1"
-        d="M840 258 L940 214 L1040 258 L1150 224 L1260 266 L1380 232 L1480 270 L1600 244" />
+        <div className="env-float">
+          <button
+            type="button"
+            className="env"
+            onClick={open}
+            aria-label="Åbn invitationen"
+            disabled={stage > 0}
+          >
+            {/* Kuvertens inderside (ses når flappen er åben) */}
+            <svg className="env-layer env-back" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+              <defs>
+                <linearGradient id="env-inside" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="var(--env-inside-dark)" />
+                  <stop offset="0.7" stopColor="var(--env-inside)" />
+                </linearGradient>
+                <filter id="env-grain" x="0" y="0" width="100%" height="100%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="7" result="n" />
+                  <feColorMatrix in="n" type="matrix"
+                    values="0 0 0 0 0.42  0 0 0 0 0.34  0 0 0 0 0.27  0 0 0 0.07 0" result="g" />
+                  <feComposite in="g" in2="SourceGraphic" operator="in" result="gi" />
+                  <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="gi" /></feMerge>
+                </filter>
+              </defs>
+              <rect width={W} height={H} rx="3" fill="url(#env-inside)" />
+            </svg>
 
-      {/* hovedmassiv med top */}
-      <path className="draw d2" pathLength="1"
-        d="M-20 452 L170 410 L330 356 L500 286 L650 200 L788 132 L900 196 L1050 292 L1210 360 L1380 402 L1620 452" />
+            {/* Invitationskortet */}
+            <div className="env-letter" aria-hidden="true">
+              <p className="letter-kicker">Vi skal giftes</p>
+              <p className="letter-names">{names}</p>
+              <span className="letter-rule" />
+              <p className="letter-date">{date}</p>
+            </div>
 
-      {/* top-nik: lille station + kors (som i skitsen) */}
-      <path className="draw d3" pathLength="1" d="M770 132 L770 108 L816 108 L816 132" />
-      <path className="draw d3" pathLength="1" d="M792 108 L792 84" />
-      <path className="draw d3" pathLength="1" d="M781 96 L803 96" />
+            {/* Forlomme med folder */}
+            <svg className="env-layer env-pocket" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+              <path d={POCKET_PATH} className="paper" filter="url(#env-grain)" />
+              <path d={`M0 ${H} L138 ${TIP - 14}`} className="fold" />
+              <path d={`M${W} ${H} L162 ${TIP - 14}`} className="fold" />
+            </svg>
 
-      {/* mellemrygge / snelinjer på massivet */}
-      <path className="draw d3" pathLength="1" d="M540 300 L640 250 L720 268 L800 220" />
-      <path className="draw d3" pathLength="1" d="M900 210 L980 262 L1080 300 L1150 330" />
-      <path className="draw d3" pathLength="1" d="M470 330 L560 360 L650 356" />
+            {/* Flappen: to sider i 3D, så indersiden ses, når den foldes op */}
+            <div className="env-flap" aria-hidden="true">
+              <svg className="flap-face flap-outer" viewBox={`0 0 ${W} ${TIP + 10}`}>
+                <path d={FLAP_PATH} className="paper paper-flap" filter="url(#env-grain)" />
+              </svg>
+              <svg className="flap-face flap-inner" viewBox={`0 0 ${W} ${TIP + 10}`}>
+                <path d={FLAP_PATH} className="paper-inner" />
+              </svg>
+            </div>
 
-      {/* forreste ryg */}
-      <path className="draw d4" pathLength="1"
-        d="M-20 512 L210 470 L420 496 L640 452 L860 488 L1080 456 L1300 492 L1620 470" />
+            {/* Voksseglet – deles i to, når kuverten åbnes */}
+            <span className="env-seal" aria-hidden="true">
+              <img src={waxSeal} alt="" className="seal-half seal-l" draggable="false" />
+              <img src={waxSeal} alt="" className="seal-half seal-r" draggable="false" />
+            </span>
+          </button>
+        </div>
 
-      {/* forgrund: bløde skygge/kontur-strøg */}
-      <path className="draw d4" pathLength="1" d="M120 486 L200 508" />
-      <path className="draw d4" pathLength="1" d="M520 470 L600 500" />
-      <path className="draw d4" pathLength="1" d="M980 470 L1060 500" />
-      <path className="draw d4" pathLength="1" d="M1360 484 L1440 508" />
-    </svg>
+        <p className="env-cta" aria-hidden="true">Åbn invitationen</p>
+      </div>
+    </div>
   );
 }

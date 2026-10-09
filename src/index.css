@@ -68,122 +68,242 @@
   }
 }
 
-/* ---------- INTRO OVERLAY (spiller ved sideåbning) ---------- */
-.intro-overlay {
+/* ---------- KUVERT-INTRO (vises ved sideåbning) ---------- */
+.env-overlay {
+  --env-paper: #ede1d1;
+  --env-flap: #f1e7d9;
+  --env-inside: #e4d4c0;
+  --env-inside-dark: #d3bfa7;
+  --env-fold: rgba(120, 96, 70, 0.16);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
   position: fixed;
   inset: 0;
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
-  background: radial-gradient(125% 95% at 50% 12%, #fffdfa 0%, #f6f0e6 100%);
-  opacity: 1;
-  transform: scale(1);
-  transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  padding: 1.5rem 1rem;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 10%, #fffdfa 0%, #f6f0e6 100%);
+  transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
   will-change: opacity, transform;
 }
-.intro-leaving {
+.env-overlay.is-leaving {
   opacity: 0;
   transform: scale(1.04);
   pointer-events: none;
 }
 
-.intro-skip {
-  position: absolute;
-  top: 1.25rem;
-  right: 1.5rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #9a9088;
-  padding: 0.5rem 0.75rem;
-  border-radius: 999px;
-  transition: color 0.2s ease, background-color 0.2s ease;
-  animation: intro-fade 0.6s ease both;
-  animation-delay: 1.2s;
-}
-.intro-skip:hover { color: #2e2a26; background: rgba(46, 42, 38, 0.05); }
-
-.intro-inner {
-  width: min(920px, 100%);
+.env-scene {
+  width: min(440px, 84vw);
   display: flex;
   flex-direction: column;
   align-items: center;
+  text-align: center;
+  transition: transform 1s var(--ease);
 }
-.intro-mtn { width: 100%; height: auto; display: block; }
+/* Når kortet glider op, rykker scenen lidt ned, så det hele forbliver centreret */
+.is-risen .env-scene { transform: translateY(9%); }
 
-/* Selv-tegnende streger */
-.draw {
-  stroke: #3a352f;
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: intro-draw 1.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+/* Overskrift */
+.env-head { margin-bottom: clamp(1.75rem, 5vh, 2.75rem); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+.env-kicker {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(0.85rem, 2.6vw, 1rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #6b6259;
+  animation: env-fade 1s var(--ease) 0.2s both;
 }
-.draw.d0 { stroke: #b08d57; animation-delay: 0.15s; }
-.d1 { animation-delay: 0.25s; stroke: #8c847a; }
-.d2 { animation-delay: 0.55s; }
-.d3 { animation-delay: 1.05s; stroke-width: 1.1; }
-.d4 { animation-delay: 1.35s; stroke: #6b6259; }
-@keyframes intro-draw { to { stroke-dashoffset: 0; } }
+.env-names {
+  font-family: "Pinyon Script", "Cormorant Garamond", Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(2.7rem, 11vw, 4.4rem);
+  line-height: 1.1;
+  color: #4a433c;
+  margin-top: 0.35rem;
+  animation: env-rise 1.1s var(--ease) 0.35s both;
+}
+.env-amp { color: #b08d57; }
 
-.intro-text { text-align: center; margin-top: -0.5rem; }
-.intro-kicker {
-  font-size: 0.72rem;
-  letter-spacing: 0.32em;
+.env-cta {
+  margin-top: clamp(1.9rem, 5vh, 2.75rem);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(0.85rem, 2.6vw, 1rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #6b6259;
+  animation: env-fade 1s var(--ease) 0.9s both, env-breathe 2.8s ease-in-out 2s infinite;
+  transition: opacity 0.5s var(--ease);
+}
+.is-cracked .env-head { opacity: 0; transform: translateY(-10px); }
+.is-cracked .env-cta { opacity: 0; animation: none; }
+
+/* Kuvert */
+.env-float {
+  width: 100%;
+  animation: env-rise 1.2s var(--ease) 0.5s both;
+}
+.env {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  perspective: 1400px;
+  cursor: pointer;
+  border-radius: 4px;
+  -webkit-tap-highlight-color: transparent;
+  animation: env-hover 5s ease-in-out 1.8s infinite;
+  transition: transform 0.5s var(--ease);
+}
+.env:disabled { cursor: default; }
+.env:hover:not(:disabled) { transform: translateY(-4px); }
+.env:focus-visible { outline: 2px solid #b08d57; outline-offset: 10px; }
+.is-cracked .env { animation: none; }
+/* Blød skygge under kuverten */
+.env::before {
+  content: "";
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: -7%;
+  height: 16%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(60, 44, 30, 0.22), transparent);
+  filter: blur(6px);
+  z-index: 0;
+  transition: opacity 0.8s var(--ease);
+}
+
+.env-layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+.env-back { z-index: 1; }
+.env-pocket {
+  z-index: 3;
+  filter: drop-shadow(0 10px 18px rgba(60, 44, 30, 0.12)) drop-shadow(0 2px 3px rgba(60, 44, 30, 0.08));
+}
+.env .paper { fill: var(--env-paper); }
+.env .paper-flap { fill: var(--env-flap); }
+.env .paper-inner { fill: var(--env-inside); }
+.env .fold { stroke: var(--env-fold); stroke-width: 0.8; fill: none; }
+
+/* Kortet inde i kuverten */
+.env-letter {
+  position: absolute;
+  z-index: 2;
+  left: 5%;
+  right: 5%;
+  top: 4%;
+  height: 92%;
+  padding: 9% 8% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background:
+    linear-gradient(#fffdf9, #fbf6ee);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(60, 44, 30, 0.08), 0 -6px 18px -10px rgba(60, 44, 30, 0.18);
+  outline: 1px solid rgba(176, 141, 87, 0.35);
+  outline-offset: -7px;
+  transition: transform 1.1s var(--ease);
+}
+.is-risen .env-letter { transform: translateY(-36%); }
+.letter-kicker {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(0.6rem, 2vw, 0.75rem);
+  letter-spacing: 0.28em;
   text-transform: uppercase;
   color: #b08d57;
-  margin-bottom: 0.9rem;
-  animation: intro-fade 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: 1.3s;
 }
-.intro-names {
+.letter-names {
+  font-family: "Pinyon Script", "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(1.7rem, 6.4vw, 2.6rem);
+  line-height: 1.15;
+  color: #3e3731;
+  margin-top: 0.2em;
+}
+.letter-rule { display: block; width: 2.5rem; height: 1px; margin: 0.5em 0 0.6em; background: linear-gradient(90deg, transparent, #b08d57, transparent); }
+.letter-date {
   font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: clamp(2.6rem, 8vw, 5.5rem);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
-  color: #2e2a26;
-  animation: intro-rise 1s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: 1.5s;
-}
-.intro-date {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.9rem;
-  margin-top: 1rem;
-  font-weight: 300;
-  letter-spacing: 0.04em;
+  font-size: clamp(0.85rem, 2.8vw, 1.05rem);
+  letter-spacing: 0.06em;
   color: #6b6259;
-  animation: intro-fade 0.9s ease both;
-  animation-delay: 1.85s;
-}
-.intro-date .intro-line { width: 2rem; height: 1px; background: #c9bfb0; }
-.intro-sub {
-  margin-top: 1.1rem;
-  max-width: 34rem;
-  font-weight: 300;
-  color: #8c847a;
-  animation: intro-fade 0.9s ease both;
-  animation-delay: 2.1s;
 }
 
-@keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes intro-rise {
-  from { opacity: 0; transform: translateY(16px); }
+/* Flappen (foldes op om sin øverste kant) */
+.env-flap {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: calc(100% * 134 / 200);
+  transform-origin: 50% 0;
+  transform-style: preserve-3d;
+  transition: transform 0.9s cubic-bezier(0.45, 0, 0.2, 1);
+}
+.is-open .env-flap { transform: rotateX(180deg); }
+.is-flipped .env-flap { z-index: 1; }
+.flap-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flap-outer { filter: drop-shadow(0 3px 4px rgba(60, 44, 30, 0.14)); }
+.flap-inner { transform: rotateY(180deg); }
+
+/* Voksseglet ved flappens spids */
+.env-seal {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 59%;
+  width: 27%;
+  aspect-ratio: 380 / 388;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 4px 6px rgba(60, 20, 20, 0.28)) drop-shadow(0 1px 1px rgba(60, 20, 20, 0.25));
+  pointer-events: none;
+}
+.seal-half {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  transition: transform 0.75s cubic-bezier(0.5, 0, 0.75, 0), opacity 0.6s ease 0.15s;
+}
+.seal-l { clip-path: polygon(0 0, 53% 0, 47% 20%, 55% 38%, 46% 57%, 54% 76%, 48% 100%, 0 100%); }
+.seal-r { clip-path: polygon(53% 0, 100% 0, 100% 100%, 48% 100%, 54% 76%, 46% 57%, 55% 38%, 47% 20%); }
+.env:hover:not(:disabled) .env-seal { animation: env-seal-nudge 0.6s var(--ease); }
+.is-cracked .seal-l { transform: translate(-22%, 60%) rotate(-24deg); opacity: 0; }
+.is-cracked .seal-r { transform: translate(20%, 64%) rotate(20deg); opacity: 0; }
+
+/* Ud-toning: kuverten synker, kortet bliver hængende et øjeblik */
+.is-leaving .env-pocket,
+.is-leaving .env-back,
+.is-leaving .env-flap { opacity: 0; transition: opacity 0.6s var(--ease), transform 0.9s cubic-bezier(0.45, 0, 0.2, 1); }
+.is-leaving .env::before { opacity: 0; }
+.is-leaving .env-letter { transform: translateY(-62%) scale(1.04); }
+
+@keyframes env-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes env-rise {
+  from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .draw { animation: none; stroke-dashoffset: 0; }
-  .intro-skip, .intro-kicker, .intro-names, .intro-date, .intro-sub {
-    animation: intro-fade 0.4s ease both;
-    animation-delay: 0s;
-  }
+@keyframes env-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes env-hover {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-5px) rotate(-0.4deg); }
+}
+@keyframes env-seal-nudge {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0); }
+  35% { transform: translate(-50%, -50%) rotate(-4deg) scale(1.02); }
+  70% { transform: translate(-50%, -50%) rotate(2deg); }
 }
 
 /* Reduced motion: gentle cross-fades, no travel or looping float */

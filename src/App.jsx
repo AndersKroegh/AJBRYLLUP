@@ -226,7 +226,6 @@ export default function App() {
       {introActive && (
         <IntroOverlay
           names={weddingData.names}
-          subtitle={weddingData.intro}
           date={weddingData.date}
           onDone={dismissIntro}
         />
