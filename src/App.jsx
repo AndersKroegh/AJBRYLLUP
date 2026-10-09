@@ -55,7 +55,7 @@ const Reveal = ({ children, delay = 0, className = '' }) => {
   return (
     <div
       ref={ref}
-      className={`transition-all duration-[900ms] ease-spring will-change-[transform,opacity] ${
+      className={`transition-[opacity,transform] duration-[900ms] ease-spring ${
         visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
       } ${className}`}
       style={{ transitionDelay: `${delay}ms` }}
@@ -222,7 +222,7 @@ export default function App() {
   }
 
   return (
-    <div className="font-sans text-ink bg-ivory min-h-screen overflow-x-hidden selection:bg-blush selection:text-ink">
+    <div className="font-sans text-ink bg-ivory min-h-screen overflow-x-clip selection:bg-blush selection:text-ink">
       {introActive && (
         <IntroOverlay
           names={weddingData.names}
@@ -322,10 +322,45 @@ function Nav({ names }) {
 }
 
 // --- LANDING PAGE ---
+// Hero-billede med diskret parallax. Transform skrives direkte på elementet
+// (højst én gang pr. frame), så resten af siden ikke re-renderes, mens man scroller.
+// På touch-skærme er parallax slået fra: dér scroller browseren på en separat
+// tråd, og et JS-styret billede vil altid halte bagefter og hakke.
+function HeroImage({ src }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    const off =
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia('(hover: none), (pointer: coarse)').matches;
+    if (!el || off) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const y = window.scrollY;
+      if (y > window.innerHeight * 1.2) return; // hero er ude af syne
+      el.style.transform = `translate3d(0, ${Math.min(y * 0.35, 260)}px, 0) scale(1.05)`;
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
+  }, []);
+
+  return (
+    <img
+      ref={ref}
+      src={src}
+      alt=""
+      className="w-full h-[120%] object-cover will-change-transform"
+      style={{ transform: 'scale(1.05)' }}
+    />
+  );
+}
+
 function LandingPage({ data, user }) {
   const [rsvpForm, setRsvpForm] = useState(emptyRsvp);
   const [rsvpStatus, setRsvpStatus] = useState('idle');
-  const [heroOffset, setHeroOffset] = useState(0);
 
   // Hjælpere til per-gæst-listen i S.U.-formularen
   const setGuest = (i, patch) => {
@@ -335,18 +370,6 @@ function LandingPage({ data, user }) {
   const addGuest = () => setRsvpForm({ ...rsvpForm, guests: [...rsvpForm.guests, emptyGuest()] });
   const removeGuest = (i) =>
     setRsvpForm({ ...rsvpForm, guests: rsvpForm.guests.filter((_, idx) => idx !== i) });
-
-  // Subtle hero parallax (respect reduced motion)
-  useEffect(() => {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) return;
-    let raf = 0;
-    const onScroll = () => {
-      raf = requestAnimationFrame(() => setHeroOffset(Math.min(window.scrollY * 0.35, 260)));
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
-  }, []);
 
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
@@ -382,12 +405,7 @@ function LandingPage({ data, user }) {
       {/* ---------- HERO ---------- */}
       <section id="hjem" className="relative h-[100svh] min-h-[620px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img
-            src={data.heroImage}
-            alt=""
-            className="w-full h-[120%] object-cover"
-            style={{ transform: `translateY(${heroOffset}px) scale(1.05)` }}
-          />
+          <HeroImage src={data.heroImage} />
           <div className="absolute inset-0 hero-scrim" />
         </div>
 
