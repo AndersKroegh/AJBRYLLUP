@@ -28,7 +28,7 @@ const NAV_LINKS = [
 
 // Tomme rækker til S.U.-formularen (per-gæst navn + allergi)
 const emptyGuest = () => ({ name: '', diet: '' });
-const emptyRsvp = () => ({ name: '', attending: 'yes', guests: [emptyGuest()], message: '' });
+const emptyRsvp = () => ({ name: '', attending: 'yes', guests: [emptyGuest()], overnight: false, glamping: '', message: '' });
 
 // --- SCROLL REVEAL (IntersectionObserver + spring-eased CSS) ---
 const Reveal = ({ children, delay = 0, className = '' }) => {
@@ -378,15 +378,17 @@ function LandingPage({ data, user }) {
     try {
       const rsvpsRef = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_rsvps');
       // Kun gæster med et navn tælles med; ved afbud gemmes ingen gæsteliste.
-      const guests =
-        rsvpForm.attending === 'yes'
-          ? rsvpForm.guests.filter((g) => g.name.trim())
-          : [];
+      const going = rsvpForm.attending === 'yes';
+      const guests = going ? rsvpForm.guests.filter((g) => g.name.trim()) : [];
+      // Overnatning/glamping gives kun mening for gæster, der deltager.
+      const overnight = going && rsvpForm.overnight;
       await addDoc(rsvpsRef, {
         name: rsvpForm.name.trim(),
         attending: rsvpForm.attending,
         guests,
         guestCount: guests.length,
+        overnight,
+        glamping: overnight ? rsvpForm.glamping : '',
         message: rsvpForm.message.trim(),
         timestamp: new Date().toISOString(),
       });
@@ -668,6 +670,44 @@ function LandingPage({ data, user }) {
                           <UserPlus size={15} /> Tilføj gæst
                         </button>
                       </Field>
+                    )}
+                    {rsvpForm.attending === 'yes' && (
+                      <div className="space-y-4">
+                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={rsvpForm.overnight}
+                            onChange={(e) =>
+                              setRsvpForm({ ...rsvpForm, overnight: e.target.checked, glamping: '' })
+                            }
+                            className="h-5 w-5 shrink-0 rounded accent-gold cursor-pointer"
+                          />
+                          <span className="text-sm text-ivory/90">Overnatning</span>
+                        </label>
+                        {rsvpForm.overnight && (
+                          <Field label="Vil du have mulighed for at sove i glamping?">
+                            <div className="grid grid-cols-2 gap-3">
+                              {[
+                                { v: 'yes', t: 'Ja' },
+                                { v: 'no', t: 'Nej' },
+                              ].map((o) => (
+                                <button
+                                  key={o.v}
+                                  type="button"
+                                  onClick={() => setRsvpForm({ ...rsvpForm, glamping: o.v })}
+                                  className={`btn-press rounded-xl py-3 text-sm font-medium border ${
+                                    rsvpForm.glamping === o.v
+                                      ? 'bg-ivory-100 text-ink border-transparent'
+                                      : 'bg-white/5 text-ivory/80 border-white/15 hover:border-white/30'
+                                  }`}
+                                >
+                                  {o.t}
+                                </button>
+                              ))}
+                            </div>
+                          </Field>
+                        )}
+                      </div>
                     )}
                     <Field label="En lille hilsen (valgfrit)">
                       <textarea
@@ -1090,14 +1130,14 @@ function AdminPage({ data, user }) {
                   <table className="w-full text-left text-sm min-w-[640px]">
                     <thead className="bg-ivory-200/60 border-b border-line">
                       <tr>
-                        {['Svar fra', 'Status', 'Antal', 'Deltagere & allergi', 'Hilsen'].map((h) => (
+                        {['Svar fra', 'Status', 'Antal', 'Deltagere & allergi', 'Overnatning', 'Hilsen'].map((h) => (
                           <th key={h} className="p-4 font-medium text-ink-soft">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
                       {rsvps.length === 0 ? (
-                        <tr><td colSpan="5" className="p-10 text-center text-ink-faint font-light">Ingen besvarelser endnu.</td></tr>
+                        <tr><td colSpan="6"className="p-10 text-center text-ink-faint font-light">Ingen besvarelser endnu.</td></tr>
                       ) : rsvps.map((rsvp) => {
                         const guests = guestsOf(rsvp);
                         const going = rsvp.attending === 'yes';
@@ -1120,6 +1160,16 @@ function AdminPage({ data, user }) {
                                     </li>
                                   ))}
                                 </ul>
+                              ) : '—'}
+                            </td>
+                            <td className="p-4 text-ink-soft">
+                              {going && rsvp.overnight ? (
+                                <>
+                                  Ja
+                                  {rsvp.glamping && (
+                                    <span className="text-ink-faint"> · Glamping: {rsvp.glamping === 'yes' ? 'ja' : 'nej'}</span>
+                                  )}
+                                </>
                               ) : '—'}
                             </td>
                             <td className="p-4 text-ink-soft max-w-xs truncate" title={rsvp.message}>{rsvp.message || '—'}</td>
