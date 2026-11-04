@@ -184,7 +184,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    signInAnonymously(auth).catch((error) => console.error("Auth error:", error));
+    signInAnonymously(auth).catch((error) => {
+      // Uden login kan databasen ikke læses – vis stadig siden med standardindhold
+      // i stedet for en evig "Et øjeblik …"-skærm. S.U.-formularen viser selv en fejl.
+      console.error("Auth error:", error);
+      setWeddingData((prev) => prev ?? DEFAULT_DATA);
+      setLoading(false);
+    });
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
   }, []);
@@ -371,15 +377,33 @@ function LandingPage({ data, user }) {
   const removeGuest = (i) =>
     setRsvpForm({ ...rsvpForm, guests: rsvpForm.guests.filter((_, idx) => idx !== i) });
 
+  const [rsvpError, setRsvpError] = useState('');
+  const [rsvpSlow, setRsvpSlow] = useState(false);
+
   const handleRsvpSubmit = async (e) => {
     e.preventDefault();
-    if (!user) return;
+    setRsvpError('');
+    if (!user) {
+      setRsvpError('Vi kunne ikke forbinde til serveren. Tjek din internetforbindelse, genindlæs siden og prøv igen.');
+      return;
+    }
     setRsvpStatus('submitting');
+    // På dårlig forbindelse venter Firestore på serveren – fortæl gæsten, at det er i gang.
+    const slowTimer = setTimeout(() => setRsvpSlow(true), 8000);
     try {
       const rsvpsRef = collection(db, 'artifacts', appId, 'public', 'data', 'wedding_rsvps');
       // Kun gæster med et navn tælles med; ved afbud gemmes ingen gæsteliste.
       const going = rsvpForm.attending === 'yes';
-      const guests = going ? rsvpForm.guests.filter((g) => g.name.trim()) : [];
+      let guests = going
+        ? rsvpForm.guests
+            .map((g) => ({ name: g.name.trim(), diet: g.diet.trim() }))
+            .filter((g) => g.name)
+        : [];
+      // Svarer man "Ja" uden at udfylde gæstelisten, tæller kontaktpersonen som gæst,
+      // så svaret ikke står som 0 personer i admin.
+      if (going && guests.length === 0) {
+        guests = [{ name: rsvpForm.name.trim(), diet: (rsvpForm.guests[0]?.diet || '').trim() }];
+      }
       // Overnatning/glamping gives kun mening for gæster, der deltager.
       const overnight = going && rsvpForm.overnight;
       await addDoc(rsvpsRef, {
@@ -396,7 +420,11 @@ function LandingPage({ data, user }) {
       setRsvpForm(emptyRsvp());
     } catch (error) {
       console.error("Fejl ved afsendelse af S.U.:", error);
+      setRsvpError('Dit svar blev desværre ikke sendt. Prøv igen om lidt – eller skriv direkte til os.');
       setRsvpStatus('idle');
+    } finally {
+      clearTimeout(slowTimer);
+      setRsvpSlow(false);
     }
   };
 
@@ -725,6 +753,14 @@ function LandingPage({ data, user }) {
                     >
                       {rsvpStatus === 'submitting' ? 'Sender...' : 'Send svar'}
                     </button>
+                    {rsvpSlow && (
+                      <p className="text-sm text-ivory/70 text-center" role="status">
+                        Det tager lidt længere end normalt – luk ikke siden, svaret sendes, så snart forbindelsen er der.
+                      </p>
+                    )}
+                    {rsvpError && (
+                      <p className="text-sm text-red-300 text-center" role="alert">{rsvpError}</p>
+                    )}
                   </form>
                 )}
               </div>
