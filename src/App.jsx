@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Heart, MapPin, Clock, Gift, Home, CheckCircle2, Lock, Users, Edit3, Plus,
-  Trash2, ChevronDown, Navigation, ArrowUpRight, HelpCircle, X, UserPlus,
+  Trash2, ChevronDown, Navigation, HelpCircle, X, UserPlus,
   CalendarPlus, Download, ExternalLink, Menu
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
@@ -21,9 +21,9 @@ const db = getFirestore(app);
 const NAV_LINKS = [
   { id: 'hjem', label: 'Hjem' },
   { id: 'program', label: 'Program' },
-  { id: 'rejse', label: 'Find vej' },
   { id: 'praktisk', label: 'Praktisk' },
   { id: 'su', label: 'S.U.' },
+  { id: 'rejse', label: 'Find vej' },
 ];
 
 // Tomme rækker til S.U.-formularen (per-gæst navn + allergi)
@@ -454,7 +454,7 @@ function LandingPage({ data, user }) {
         <Reveal>
           <p className="text-[0.7rem] uppercase tracking-widest2 text-gold mb-6">Velkommen</p>
           <p
-            className="font-serif text-2xl md:text-4xl leading-snug text-ink"
+            className="font-serif text-2xl md:text-4xl leading-snug text-ink whitespace-pre-line"
             style={{ letterSpacing: '-0.01em' }}
           >
             {data.intro}
@@ -469,7 +469,7 @@ function LandingPage({ data, user }) {
         <section>
           <Reveal>
             <SectionHeading icon={MapPin} kicker="Ceremoni & Fest" title="Tid & Sted" />
-            <p className="text-ink-soft leading-relaxed max-w-2xl mx-auto text-lg font-light text-center mt-8">
+            <p className="text-ink-soft leading-relaxed max-w-2xl mx-auto text-lg font-light text-center mt-8 whitespace-pre-line">
               {data.timeAndPlace}
             </p>
           </Reveal>
@@ -498,36 +498,6 @@ function LandingPage({ data, user }) {
           </Reveal>
         </section>
 
-        {/* ---------- FIND VEJ / KORT ---------- */}
-        <section id="rejse">
-          <Reveal>
-            <SectionHeading icon={Navigation} kicker="Praktisk" title="Find Vej" />
-          </Reveal>
-          {(() => {
-            // Én lokation (vielse og fest samme sted) → vis ét bredt kort.
-            const sameVenue =
-              `${data.ceremonyName}|${data.ceremonyAddress}`.trim().toLowerCase() ===
-              `${data.venueName}|${data.venueAddress}`.trim().toLowerCase();
-            if (sameVenue) {
-              return (
-                <div className="max-w-xl mx-auto mt-12">
-                  <MapCard
-                    label="Ceremoni & Fest"
-                    name={data.venueName}
-                    address={data.venueAddress}
-                  />
-                </div>
-              );
-            }
-            return (
-              <div className="grid md:grid-cols-2 gap-6 md:gap-8 mt-12">
-                <MapCard delay={0} label="Vielse" name={data.ceremonyName} address={data.ceremonyAddress} />
-                <MapCard delay={120} label="Reception & Fest" name={data.venueName} address={data.venueAddress} />
-              </div>
-            );
-          })()}
-        </section>
-
         {/* ---------- OVERNATNING + ØNSKELISTE ---------- */}
         <section className="grid md:grid-cols-2 gap-14 md:gap-20">
           <Reveal>
@@ -535,7 +505,7 @@ function LandingPage({ data, user }) {
               <Home className="mx-auto md:mx-0 text-gold mb-5" size={28} strokeWidth={1.4} />
               <h2 className="font-serif text-3xl text-ink">Overnatning</h2>
               <div className="rule mt-4 mx-auto md:mx-0" />
-              <p className="text-ink-soft leading-relaxed font-light mt-6">{data.accommodation}</p>
+              <p className="text-ink-soft leading-relaxed font-light mt-6 whitespace-pre-line">{data.accommodation}</p>
             </div>
           </Reveal>
           <Reveal delay={150}>
@@ -543,28 +513,10 @@ function LandingPage({ data, user }) {
               <Gift className="mx-auto md:mx-0 text-gold mb-5" size={28} strokeWidth={1.4} />
               <h2 className="font-serif text-3xl text-ink">Ønskeliste</h2>
               <div className="rule mt-4 mx-auto md:mx-0" />
-              <ul className="text-ink-soft font-light space-y-4 mt-6">
-                {data.wishlist.map((item) => (
-                  <li key={item.id} className="flex items-start gap-3 justify-center md:justify-start">
-                    <Heart size={15} className="mt-1.5 flex-shrink-0 text-blush fill-current" />
-                    {item.link ? (
-                      <a
-                        href={item.link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group inline-flex items-center gap-1 hover:text-ink transition-colors"
-                      >
-                        <span className="underline decoration-line underline-offset-4 group-hover:decoration-gold">
-                          {item.item}
-                        </span>
-                        <ArrowUpRight size={13} className="text-gold" />
-                      </a>
-                    ) : (
-                      <span>{item.item}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              {data.wishlistText && (
+                <p className="text-ink-soft leading-relaxed font-light mt-6 whitespace-pre-line">{data.wishlistText}</p>
+              )}
+              {data.wishlistUrl && <WishlistGift url={data.wishlistUrl} />}
             </div>
           </Reveal>
         </section>
@@ -731,6 +683,36 @@ function LandingPage({ data, user }) {
             </div>
           </Reveal>
         </section>
+
+        {/* ---------- FIND VEJ / KORT ---------- */}
+        <section id="rejse">
+          <Reveal>
+            <SectionHeading icon={Navigation} kicker="Praktisk" title="Find Vej" />
+          </Reveal>
+          {(() => {
+            // Én lokation (vielse og fest samme sted) → vis ét bredt kort.
+            const sameVenue =
+              `${data.ceremonyName}|${data.ceremonyAddress}`.trim().toLowerCase() ===
+              `${data.venueName}|${data.venueAddress}`.trim().toLowerCase();
+            if (sameVenue) {
+              return (
+                <div className="max-w-xl mx-auto mt-12">
+                  <MapCard
+                    label="Ceremoni & Fest"
+                    name={data.venueName}
+                    address={data.venueAddress}
+                  />
+                </div>
+              );
+            }
+            return (
+              <div className="grid md:grid-cols-2 gap-6 md:gap-8 mt-12">
+                <MapCard delay={0} label="Vielse" name={data.ceremonyName} address={data.ceremonyAddress} />
+                <MapCard delay={120} label="Reception & Fest" name={data.venueName} address={data.venueAddress} />
+              </div>
+            );
+          })()}
+        </section>
       </div>
 
       {/* ---------- FOOTER ---------- */}
@@ -826,6 +808,46 @@ function AddToCalendar({ data }) {
   );
 }
 
+// --- ØNSKELISTE-GAVE (link + "Tryk her"-pil) ---
+function WishlistGift({ url }) {
+  return (
+    <div className="mt-8 flex items-center justify-center md:justify-start gap-2">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Se vores ønskeliste (åbner i en ny fane)"
+        className="btn-press group relative shrink-0 w-24 h-24 rounded-full bg-ivory-100 border border-line shadow-soft hover:shadow-lift hover:border-gold-soft flex items-center justify-center transition-[box-shadow,border-color] duration-500"
+      >
+        <span className="absolute inset-2 rounded-full bg-blush/30 group-hover:bg-blush/50 transition-colors duration-500" />
+        <Gift
+          size={42}
+          strokeWidth={1.2}
+          className="relative text-gold group-hover:text-gold-deep animate-gift-wiggle"
+        />
+      </a>
+      <div aria-hidden="true" className="flex flex-col items-start -mt-10 select-none">
+        <span className="font-script text-3xl text-gold-deep leading-none -rotate-6 ml-4">Tryk her</span>
+        <svg width="72" height="38" viewBox="0 0 72 38" fill="none" className="text-gold animate-nudge -mt-1">
+          <path
+            d="M62 4 C 58 22, 36 32, 8 28"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+          <path
+            d="M16 21 L 7 28 L 17 33"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 // --- MAP CARD (no API key — Google Maps embed) ---
 function MapCard({ label, name, address, delay = 0 }) {
   const query = encodeURIComponent(`${name}, ${address}`);
@@ -886,7 +908,7 @@ function FAQSection({ items = [] }) {
               </button>
               <div className={`grid transition-all duration-300 ease-spring ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                 <div className="overflow-hidden">
-                  <p className="text-ink-soft font-light leading-relaxed pb-6 pr-8">{it.a}</p>
+                  <p className="text-ink-soft font-light leading-relaxed pb-6 pr-8 whitespace-pre-line">{it.a}</p>
                 </div>
               </div>
             </div>
@@ -1065,27 +1087,8 @@ function AdminPage({ data, user }) {
               </AdminGroup>
 
               <AdminGroup title="Ønskeliste">
-                {formData.wishlist.map((item, index) => (
-                  <div key={item.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-line">
-                    <input className="flex-1 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="Ønske"
-                      value={item.item}
-                      onChange={(e) => {
-                        const w = [...formData.wishlist]; w[index] = { ...w[index], item: e.target.value }; set({ wishlist: w });
-                      }} />
-                    <input className="flex-1 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="Link (valgfrit)"
-                      value={item.link}
-                      onChange={(e) => {
-                        const w = [...formData.wishlist]; w[index] = { ...w[index], link: e.target.value }; set({ wishlist: w });
-                      }} />
-                    <button onClick={() => set({ wishlist: formData.wishlist.filter((_, i) => i !== index) })}
-                      className="p-2 text-ink-faint hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-                <AddButton onClick={() => set({ wishlist: [...formData.wishlist, { id: Date.now(), item: "", link: "" }] })}>
-                  Tilføj ønske
-                </AddButton>
+                <AArea label="Tekst" value={formData.wishlistText} onChange={(v) => set({ wishlistText: v })} />
+                <AInput label="Link til ønskeliste (gaven)" value={formData.wishlistUrl} onChange={(v) => set({ wishlistUrl: v })} />
               </AdminGroup>
 
               <AdminGroup title="Praktisk / FAQ">
@@ -1102,7 +1105,7 @@ function AdminPage({ data, user }) {
                         <Trash2 size={16} />
                       </button>
                     </div>
-                    <textarea rows={2} className="w-full border border-line rounded-lg p-2 text-sm outline-none focus:border-gold resize-none" placeholder="Svar"
+                    <textarea rows={3} className="w-full border border-line rounded-lg p-2 text-sm outline-none focus:border-gold resize-y" placeholder="Svar"
                       value={item.a}
                       onChange={(e) => {
                         const f = [...formData.faq]; f[index] = { ...f[index], a: e.target.value }; set({ faq: f });
@@ -1228,8 +1231,8 @@ const AArea = ({ label, value, onChange }) => (
   <div>
     <label className="block text-xs text-ink-faint uppercase tracking-wider mb-1.5">{label}</label>
     <textarea
-      rows={3}
-      className="w-full bg-white border border-line rounded-lg p-2.5 outline-none focus:border-gold transition-colors resize-none"
+      rows={5}
+      className="w-full bg-white border border-line rounded-lg p-2.5 outline-none focus:border-gold transition-colors resize-y"
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
     />

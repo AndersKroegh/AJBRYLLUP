@@ -31,6 +31,7 @@ export default {
       fontFamily: {
         serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        script: ['"Pinyon Script"', '"Cormorant Garamond"', 'Georgia', 'serif'],
       },
       letterSpacing: {
         widest2: '0.35em',
@@ -57,11 +58,26 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(14px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        // Gaven vrikker kort, holder så en pause
+        'gift-wiggle': {
+          '0%, 70%, 100%': { transform: 'rotate(0deg) scale(1)' },
+          '76%': { transform: 'rotate(-9deg) scale(1.06)' },
+          '82%': { transform: 'rotate(7deg) scale(1.06)' },
+          '88%': { transform: 'rotate(-4deg) scale(1.03)' },
+          '94%': { transform: 'rotate(2deg) scale(1)' },
+        },
+        // Pilen skubber blidt ind mod gaven
+        nudge: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '50%': { transform: 'translateX(-5px)' },
+        },
       },
       animation: {
         floaty: 'floaty 3.5s ease-in-out infinite',
         shimmer: 'shimmer 6s linear infinite',
         'fade-up': 'fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'gift-wiggle': 'gift-wiggle 3.2s ease-in-out infinite',
+        nudge: 'nudge 1.6s ease-in-out infinite',
       },
     },
   },

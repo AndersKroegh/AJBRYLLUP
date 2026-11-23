@@ -34,11 +34,9 @@ export const DEFAULT_DATA = {
     { id: 3, time: "18:00", event: "Middag & Fest" },
     { id: 4, time: "23:30", event: "Brudevals" }
   ],
-  wishlist: [
-    { id: 1, item: "Oplevelser & rejsegavekort", link: "" },
-    { id: 2, item: "Bidrag til bryllupsrejsen", link: "" },
-    { id: 3, item: "Gavekort til hjemmet", link: "" }
-  ],
+  // Ønskeliste: kort tekst + gave-knap der linker til ønskelisten
+  wishlistText: "Jeres tilstedeværelse er den største gave. Har I alligevel lyst til at give os noget, har vi samlet vores ønsker ét sted.",
+  wishlistUrl: "https://onskeskyen.dk/da/wishlists/GR6s6sFfgzYkgIKD",
   faq: [
     { id: 1, q: "Hvad er dresscode?", a: "Vi ønsker os en festlig og elegant dag — tænk gerne jakkesæt og kjole. Undgå venligst helt hvidt af hensyn til bruden." },
     { id: 2, q: "Hvordan kommer jeg til Sans & Samling?", a: "Adressen er Ikastvej 7, 7361 Ejstrupholm. Der er gode parkeringsmuligheder på stedet — og overvej gerne at køre sammen med andre gæster." },
