@@ -7,7 +7,7 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
-  getFirestore, doc, setDoc, collection, addDoc, onSnapshot, updateDoc
+  getFirestore, doc, setDoc, collection, addDoc, onSnapshot, updateDoc, deleteDoc, writeBatch
 } from 'firebase/firestore';
 import { firebaseConfig, appId, DEFAULT_DATA } from './weddingConfig';
 import IntroOverlay from './IntroOverlay';
@@ -479,21 +479,19 @@ function LandingPage({ data, user }) {
         <section id="program">
           <Reveal>
             <div className="bg-ivory-100 border border-line rounded-3xl shadow-soft p-8 md:p-14">
-              <SectionHeading icon={Clock} kicker="Timeplan" title="Dagens Program" />
-              <div className="max-w-md mx-auto relative mt-12 pl-8">
-                <span className="absolute left-[6px] top-2 bottom-2 w-px bg-gradient-to-b from-gold/30 via-line to-transparent" />
-                <div className="space-y-9">
-                  {data.program.map((item, i) => (
-                    <Reveal key={item.id} delay={i * 90}>
-                      <div className="relative">
-                        <span className="absolute -left-8 top-1.5 w-3.5 h-3.5 rounded-full bg-ivory border-2 border-gold" />
-                        <h3 className="font-serif text-2xl text-ink leading-none">{item.time}</h3>
-                        <p className="text-ink-soft font-light mt-1">{item.event}</p>
-                      </div>
-                    </Reveal>
-                  ))}
-                </div>
-              </div>
+              {(() => {
+                const friday = (data.fridayProgram || []).filter((it) => it.time || it.event);
+                const hasFriday = friday.length > 0;
+                return (
+                  <>
+                    <SectionHeading icon={Clock} kicker="Timeplan" title={hasFriday ? 'Program' : 'Dagens Program'} />
+                    <div className={`mt-12 grid gap-12 ${hasFriday ? 'md:grid-cols-2 md:gap-10' : ''}`}>
+                      {hasFriday && <Timeline title={data.fridayTitle} items={friday} />}
+                      <Timeline title={hasFriday ? data.saturdayTitle : ''} items={data.program} />
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </Reveal>
         </section>
@@ -808,6 +806,31 @@ function AddToCalendar({ data }) {
   );
 }
 
+// --- TIDSLINJE (én dag i programmet) ---
+function Timeline({ title, items = [] }) {
+  return (
+    <div className="max-w-md w-full mx-auto">
+      {title && (
+        <p className="text-center text-[0.7rem] uppercase tracking-widest2 text-gold mb-8">{title}</p>
+      )}
+      <div className="relative pl-8">
+        <span className="absolute left-[6px] top-2 bottom-2 w-px bg-gradient-to-b from-gold/30 via-line to-transparent" />
+        <div className="space-y-9">
+          {items.map((item, i) => (
+            <Reveal key={item.id ?? i} delay={i * 90}>
+              <div className="relative">
+                <span className="absolute -left-8 top-1.5 w-3.5 h-3.5 rounded-full bg-ivory border-2 border-gold" />
+                <h3 className="font-serif text-2xl text-ink leading-none">{item.time}</h3>
+                <p className="text-ink-soft font-light mt-1">{item.event}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- ØNSKELISTE-GAVE (link + "Tryk her"-pil) ---
 function WishlistGift({ url }) {
   return (
@@ -962,6 +985,31 @@ function AdminPage({ data, user }) {
 
   const set = (patch) => setFormData({ ...formData, ...patch });
 
+  // --- Slet S.U.-svar ---
+  const rsvpDoc = (id) => doc(db, 'artifacts', appId, 'public', 'data', 'wedding_rsvps', id);
+  const deleteError = (error) => {
+    console.error("Fejl ved sletning:", error);
+    alert(error?.code === 'permission-denied'
+      ? 'Sletning er ikke slået til endnu. Opdater sikkerhedsreglerne i Firebase (se firestore.rules).'
+      : 'Kunne ikke slette. Prøv igen.');
+  };
+  const handleDeleteRsvp = async (rsvp) => {
+    if (!window.confirm(`Slet svaret fra ${rsvp.name || 'ukendt'}? Det kan ikke fortrydes.`)) return;
+    try { await deleteDoc(rsvpDoc(rsvp.id)); } catch (error) { deleteError(error); }
+  };
+  const handleDeleteAllRsvps = async () => {
+    if (!rsvps.length) return;
+    if (!window.confirm(`Slet ALLE ${rsvps.length} besvarelser? Det kan ikke fortrydes.`)) return;
+    try {
+      // Firestore tillader højst 500 handlinger pr. batch
+      for (let i = 0; i < rsvps.length; i += 450) {
+        const batch = writeBatch(db);
+        rsvps.slice(i, i + 450).forEach((r) => batch.delete(rsvpDoc(r.id)));
+        await batch.commit();
+      }
+    } catch (error) { deleteError(error); }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-ivory p-4">
@@ -1062,28 +1110,15 @@ function AdminPage({ data, user }) {
                 </div>
               </AdminGroup>
 
-              <AdminGroup title="Program">
-                {formData.program.map((item, index) => (
-                  <div key={item.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-line">
-                    <input className="w-24 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="13:00"
-                      value={item.time}
-                      onChange={(e) => {
-                        const p = [...formData.program]; p[index] = { ...p[index], time: e.target.value }; set({ program: p });
-                      }} />
-                    <input className="flex-1 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="Begivenhed"
-                      value={item.event}
-                      onChange={(e) => {
-                        const p = [...formData.program]; p[index] = { ...p[index], event: e.target.value }; set({ program: p });
-                      }} />
-                    <button onClick={() => set({ program: formData.program.filter((_, i) => i !== index) })}
-                      className="p-2 text-ink-faint hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-                <AddButton onClick={() => set({ program: [...formData.program, { id: Date.now(), time: "", event: "" }] })}>
-                  Tilføj punkt
-                </AddButton>
+              <AdminGroup title="Program — fredag">
+                <p className="text-xs text-ink-faint -mt-2">Vises på siden ved siden af lørdagen. Slet alle punkter for at skjule fredagen.</p>
+                <AInput label="Overskrift" value={formData.fridayTitle} onChange={(v) => set({ fridayTitle: v })} />
+                <ProgramEditor items={formData.fridayProgram || []} onChange={(list) => set({ fridayProgram: list })} />
+              </AdminGroup>
+
+              <AdminGroup title="Program — lørdag (bryllupsdagen)">
+                <AInput label="Overskrift (vises når fredagen er med)" value={formData.saturdayTitle} onChange={(v) => set({ saturdayTitle: v })} />
+                <ProgramEditor items={formData.program} onChange={(list) => set({ program: list })} />
               </AdminGroup>
 
               <AdminGroup title="Ønskeliste">
@@ -1121,7 +1156,17 @@ function AdminPage({ data, user }) {
 
           {activeTab === 'rsvps' && (
             <div className="space-y-6">
-              <h1 className="text-3xl font-serif text-ink border-b border-line pb-5">S.U. besvarelser</h1>
+              <div className="flex justify-between items-center gap-4 border-b border-line pb-5">
+                <h1 className="text-3xl font-serif text-ink">S.U. besvarelser</h1>
+                {rsvps.length > 0 && (
+                  <button
+                    onClick={handleDeleteAllRsvps}
+                    className="btn-press inline-flex items-center gap-1.5 text-sm font-medium text-red-500 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-50"
+                  >
+                    <Trash2 size={15} /> Slet alle
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <StatCard tone="sage" label="Gæster i alt" value={attendingPeople} />
                 <StatCard tone="blush" label="Afbud" value={notCount} />
@@ -1136,11 +1181,12 @@ function AdminPage({ data, user }) {
                         {['Svar fra', 'Status', 'Antal', 'Deltagere & allergi', 'Overnatning', 'Hilsen'].map((h) => (
                           <th key={h} className="p-4 font-medium text-ink-soft">{h}</th>
                         ))}
+                        <th className="p-4"><span className="sr-only">Slet</span></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
                       {rsvps.length === 0 ? (
-                        <tr><td colSpan="6"className="p-10 text-center text-ink-faint font-light">Ingen besvarelser endnu.</td></tr>
+                        <tr><td colSpan="7" className="p-10 text-center text-ink-faint font-light">Ingen besvarelser endnu.</td></tr>
                       ) : rsvps.map((rsvp) => {
                         const guests = guestsOf(rsvp);
                         const going = rsvp.attending === 'yes';
@@ -1176,6 +1222,16 @@ function AdminPage({ data, user }) {
                               ) : '—'}
                             </td>
                             <td className="p-4 text-ink-soft max-w-xs truncate" title={rsvp.message}>{rsvp.message || '—'}</td>
+                            <td className="p-2 text-right">
+                              <button
+                                onClick={() => handleDeleteRsvp(rsvp)}
+                                aria-label={`Slet svar fra ${rsvp.name || 'ukendt'}`}
+                                title="Slet svar"
+                                className="p-2 text-ink-faint hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
@@ -1237,6 +1293,33 @@ const AArea = ({ label, value, onChange }) => (
       onChange={(e) => onChange(e.target.value)}
     />
   </div>
+);
+
+// Redigering af én dags program (tid + begivenhed)
+const ProgramEditor = ({ items, onChange }) => (
+  <>
+    {items.map((item, index) => (
+      <div key={item.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-line">
+        <input className="w-24 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="13:00"
+          value={item.time}
+          onChange={(e) => {
+            const p = [...items]; p[index] = { ...p[index], time: e.target.value }; onChange(p);
+          }} />
+        <input className="flex-1 border border-line rounded-lg p-2 text-sm outline-none focus:border-gold" placeholder="Begivenhed"
+          value={item.event}
+          onChange={(e) => {
+            const p = [...items]; p[index] = { ...p[index], event: e.target.value }; onChange(p);
+          }} />
+        <button onClick={() => onChange(items.filter((_, i) => i !== index))}
+          className="p-2 text-ink-faint hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+          <Trash2 size={16} />
+        </button>
+      </div>
+    ))}
+    <AddButton onClick={() => onChange([...items, { id: Date.now(), time: "", event: "" }])}>
+      Tilføj punkt
+    </AddButton>
+  </>
 );
 
 const AddButton = ({ onClick, children }) => (

@@ -28,6 +28,12 @@ export const DEFAULT_DATA = {
   ceremonyAddress: "Ikastvej 7, 7361 Ejstrupholm",
   venueName: "Sans & Samling",
   venueAddress: "Ikastvej 7, 7361 Ejstrupholm",
+  // Tidsplan for fredagen (dagen før) — vises kun, hvis der er punkter
+  fridayTitle: "Fredag 9. juli",
+  fridayProgram: [
+    { id: 1, time: "15:00", event: "Ankomst & indkvartering" }
+  ],
+  saturdayTitle: "Lørdag 10. juli",
   program: [
     { id: 1, time: "13:00", event: "Vielse" },
     { id: 2, time: "15:00", event: "Reception & Bryllupskage" },
